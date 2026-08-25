@@ -31,7 +31,7 @@ kb-video = "okf_kb.video:main"
 tests = "pytest:main"
 
 [dependency-groups]
-dev = ["pytest>=8.3", "ty>=0.0.1a1"]
+dev = ["pytest>=8.3"]
 all = ["okf-kb[ingest,video]"]
 
 [build-system]
