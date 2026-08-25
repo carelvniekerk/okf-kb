@@ -1,0 +1,43 @@
+# okf.toml — marks a directory as a knowledge-base root and describes its layout.
+#
+# Every tool walks up from the working directory looking for this file, the way
+# git finds .git. Its presence is what makes a folder a bundle; its contents are
+# optional. Every key below has a default matching the canonical layout, so a
+# conventional bundle can get away with an empty file.
+
+[bundle]
+title = "🧠 Knowledge Base"    # the root index's H1
+okf_version = "0.2"            # the OKF spec version this bundle targets
+kb_format = "1.0"              # this repo's own conventions
+
+# Directory names, relative to the bundle root. Configure these when adopting a
+# folder that already uses different names; omit them otherwise.
+[paths]
+wiki = "wiki"                  # the OKF bundle itself
+raw = "raw"                    # source material (OKF's references zone, §6.3)
+output = "output"              # transient reports, gitignored
+
+# Display title per wiki subdirectory. A directory with no entry here falls back
+# to its own name.
+[directories]
+foundations = "🏗️ Foundations"
+efficiency = "⚡ Efficient Inference & Training"
+alignment = "🎯 Alignment & Post-Training"
+research = "🔭 Research Directions"
+projects = "🏁 Projects"
+tools = "🔧 Tools"
+
+# How the root index groups those directories under top-level headings, in the
+# order given. Directories missing from every group are still rendered, in a
+# trailing "📁 Unfiled" group, so a new section is never silently dropped.
+[[groups]]
+title = "🤖 Machine Learning & LLMs"
+directories = ["foundations", "efficiency", "alignment", "research"]
+
+[[groups]]
+title = "🏁 Projects"
+directories = ["projects"]
+
+[[groups]]
+title = "🔧 Tools"
+directories = ["tools"]
