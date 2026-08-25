@@ -1,0 +1,43 @@
+[project]
+name = "okf-kb"
+version = "0.1.0"
+description = "Tooling for agent-maintained Open Knowledge Format knowledge bases"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = ["pyyaml>=6.0.3", "rank-bm25>=0.2", "rich>=13.0", "typer>=0.12"]
+
+# Heavy, platform-sensitive dependencies are opt-in. Every module that needs one
+# imports it inside the function that uses it, so a core-only install imports and
+# runs fine and fails only on the subcommand whose extra is missing.
+[project.optional-dependencies]
+ingest = [
+    "beautifulsoup4>=4.12",
+    "markdownify>=0.13",
+    "pymupdf>=1.24",
+    "requests>=2.31",
+]
+video = ["mlx-whisper>=0.4.3", "python-slugify>=8.0.4", "yt-dlp>=2026.3.17"]
+all = ["okf-kb[ingest,video]"]
+
+[project.scripts]
+kb-search = "okf_kb.search:app"
+kb-stats = "okf_kb.stats:app"
+kb-export = "okf_kb.export:app"
+kb-ingest = "okf_kb.ingest:app"
+kb-health = "okf_kb.health:app"
+kb-index = "okf_kb.index_gen:app"
+kb-provenance = "okf_kb.provenance:app"
+kb-video = "okf_kb.video:main"
+tests = "pytest:main"
+
+[dependency-groups]
+dev = ["pytest>=8.3", "ty>=0.0.1a1"]
+all = ["okf-kb[ingest,video]"]
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"

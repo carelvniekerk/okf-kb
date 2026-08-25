@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv
+
+# uv
+.python-version
+
+# Build artefacts
+dist/
+build/
+
+# Test and lint caches
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+.ty_cache/
+
+# OS
+.DS_Store
+
+# Environment
+.envrc
+.cleanup
+
+# Scratch space for manual testing against a throwaway bundle
+scratch/
