@@ -21,9 +21,10 @@ htmlcov/
 # OS
 .DS_Store
 
-# Environment
+# Local dotset state
 .envrc
 .cleanup
+.uvgroups
 
 # Scratch space for manual testing against a throwaway bundle
 scratch/
