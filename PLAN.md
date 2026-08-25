@@ -44,8 +44,8 @@ commit as the flag.
 Each phase leaves both repos green. No big-bang cutover.
 
 - **0 — scaffold** ✅ repo, pyproject, extras, gitignore, pre-commit
-- **1 — extract** 🔄 `config.py` ✅ · move modules and tests onto it · export
-  `.pre-commit-hooks.yaml` · origin repo consumes the package
+- **1 — extract** 🔄 `config.py` ✅ · modules and tests moved onto it ✅ ·
+  export `.pre-commit-hooks.yaml` · origin repo consumes the package
 - **2 — skills + spec** core skills into the plugin · split `CLAUDE.md` into
   portable spec vs repo-local facts · provenance stamping · `kb_format` 1.1
 - **3 — init/adopt** the interview skill and `kb-scaffold` · adopt an existing
@@ -60,32 +60,32 @@ Each phase leaves both repos green. No big-bang cutover.
 is what still has to be wired up, and it is the list to check against before
 calling phase 1 or 3 done.
 
-### Modules to convert (phase 1)
+### Modules converted ✅
 
-Each currently hardcodes a relative path, so it only works from the bundle
-root. Replace the module constant with a `config.load()` default, keeping the
-existing `--wiki-dir`-style flags as explicit overrides — the test suite passes
-fixture directories that way and must keep working.
+`health.py`, `index_gen.py`, `provenance.py`, `ingest.py`, `search.py` and
+`stats.py` all take their directories from config now, keeping their explicit
+`--wiki-dir`-style flags as overrides. `ROOT_TITLE`, `SECTION_TITLES` and
+`ROOT_GROUPS` are supplied by `[bundle] title`, `[directories]` and
+`[[groups]]`, and `okf_version` / `kb_format` in the generated root index come
+from config, so the bundle can no longer disagree with what it declares.
 
-| Module | Hardcoded today |
-|---|---|
-| `health.py` | `RAW_DIR`, `WIKI_DIR`, `OUTPUT_DIR` |
-| `index_gen.py` | `WIKI_DIR` |
-| `provenance.py` | `WIKI_DIR` |
-| `ingest.py` | `RAW_DIR` |
-| `search.py` | `Path("wiki")` as a Typer default |
-| `stats.py` | `Path("wiki")` as a Typer default |
+Verified end to end: `uv tool install`ed binaries run from `wiki/efficiency/`
+against the origin repo, and `kb-index --check` reports all 12 committed index
+files current — the extracted package reproduces them byte for byte from
+`okf.toml` alone.
 
-Also in `index_gen.py`, and easy to miss because it is not a path: `ROOT_TITLE`,
-`SECTION_TITLES` and `ROOT_GROUPS` hardcode *one* knowledge base's subject
-taxonomy. Any other bundle gets every directory dumped into the "📁 Unfiled"
-fallback. These move to `[bundle] title`, `[directories]` and `[[groups]]` —
-`config.Config` already carries all three.
+Two CWD bugs surfaced in the process and are fixed:
 
-**Resolve the version duplication.** `okf_version` and `kb_format` are written
-into `wiki/INDEX.md` frontmatter today, but `INDEX.md` is generated. `okf.toml`
-becomes the source of truth and `index_gen` renders from config; otherwise the
-two disagree the first time someone edits one.
+- `check_stale_source_files` resolved root-relative `raw/...` resources against
+  the working directory, so all 42 read as missing when run from a subdirectory.
+- `check_image_refs` / `check_image_subdirs` were passed a bare `Path()` as the
+  root that issue text is reported relative to.
+
+**Still to de-personalise.** The module-level `SECTION_TITLES` and `ROOT_GROUPS`
+remain as fallbacks for a bundle declaring none, and they still name the origin
+repo's subjects. Harmless — `_grouped` drops groups whose directories are all
+absent — but they should become generic defaults once `init` writes a taxonomy
+for every new bundle.
 
 ### Skills to teach about `okf.toml`
 

@@ -196,6 +196,36 @@ def load_from(root: Path) -> Config:
     )
 
 
+def resolve_dir(
+    explicit: Path | None,
+    which: str,
+    start: Path | None = None,
+) -> Path:
+    """Resolve a command's directory option against the enclosing bundle.
+
+    Commands keep their explicit ``--wiki-dir``-style flags, so a caller — a
+    test fixture, a one-off run against another checkout — can still point them
+    anywhere. Config only supplies the default, which is what lets a command be
+    run from anywhere inside a bundle instead of only from its root.
+
+    Args:
+        explicit: The value passed on the command line, if any.
+        which: Attribute of :class:`Config` to fall back to: ``wiki``, ``raw``
+            or ``output``.
+        start: Directory to discover from. Defaults to the working directory.
+
+    Returns:
+        ``explicit`` when given, otherwise the configured directory.
+
+    Raises:
+        ConfigError: If no value was given and no bundle encloses ``start``.
+
+    """
+    if explicit is not None:
+        return explicit
+    return getattr(load(start), which)
+
+
 def _table(raw: dict[str, Any], key: str, path: Path) -> dict[str, Any]:
     """Return a top-level table, defaulting to empty.
 
