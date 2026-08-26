@@ -211,10 +211,15 @@ Watch for tasks that predate the adoption and no longer work. Two kinds recur:
 
 - A command invoking a tool through a project environment this bundle no longer
   has — `uv run kb-health` where `kb-health` is now installed as a tool.
-- A bare `/compile`, `/capture` or `/meeting` from a local skill copy, where the
-  skills now arrive from a plugin and are namespaced `/kb:compile`, `/kb:capture`,
-  `/kb:meeting`. A task pointing at a skill that no longer exists fails silently
-  until someone runs it, so rewrite these rather than only reporting them.
+- An un-namespaced skill name left over from a local `.claude/skills/` copy.
+  Skills that arrive from a plugin are addressed `/<plugin>:<skill>`, and the
+  plugin is not always `kb`: compile, health, verify, wiki-search, init and adopt
+  ship in `kb`, but capture, meeting and update-brief are `kb-capture`, ingest and
+  transcribe are `kb-ingest`, and video is `kb-video`. So a task reading `/capture`
+  becomes `/kb-capture:capture`, not `/kb:capture`. Check each name against the
+  plugin that actually ships it — a task pointing at a skill that does not exist
+  fails silently until someone runs it, so rewrite these rather than only
+  reporting them.
 
 While you are in the file, de-escape any emoji written as `\uXXXX` surrogate
 pairs. VS Code renders them either way, but a label the user cannot read in the

@@ -4,7 +4,7 @@ description: >
   Ingest a new source into the knowledge base — handles arXiv papers, local PDFs, web clippings,
   and manual notes already in raw/.
   Fetches content, localises images, commits, and offers to compile.
-  YouTube videos are handled by /video instead.
+  YouTube videos are handled by /kb-video:video instead.
 when_to_use: When the user provides a source to ingest (arXiv ID, URL, PDF path, or raw/ file) and asks to add it to the knowledge base.
 allowed-tools: Read Write Bash(kb-ingest *) Bash(git *) WebFetch
 disable-model-invocation: true
@@ -43,7 +43,7 @@ Determine the source type from the argument and follow the appropriate workflow:
 
 ## YouTube video (URL like `https://www.youtube.com/watch?v=...`)
 
-Defer to the `/video` skill — it stages raw materials in `video_scratch/`, judges transcript quality, extracts key frames via ffmpeg, and writes a structured discussion article in `raw/videos/<slug>-<id>.md`.
+Defer to the `/kb-video:video` skill — it stages raw materials in `video_scratch/`, judges transcript quality, extracts key frames via ffmpeg, and writes a structured discussion article in `raw/videos/<slug>-<id>.md`.
 Do not invoke `kb-ingest` for videos.
 
 ## Manual note (already in `raw/`)

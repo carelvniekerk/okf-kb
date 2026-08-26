@@ -4,7 +4,7 @@ description: >
   Run a full wiki health check — automated broken-link and image checks, followed by LLM-level
   analysis of stale content, missing articles, and structural improvements.
   Does not auto-fix; reports findings grouped by severity and waits for instruction.
-when_to_use: When the user says "health check", "lint the wiki", "audit the wiki", or types /health.
+when_to_use: When the user says "health check", "lint the wiki", "audit the wiki", or types /kb:health.
 allowed-tools: Read Bash(kb-health)
 disable-model-invocation: true
 ---

@@ -4,7 +4,7 @@ description: >
   Transcribe any untranscribed handwritten notes in raw/handwritten/ into clean structured markdown.
   Saves transcriptions to raw/transcriptions/.
   Never modifies or deletes files in raw/handwritten/ (it is a symlinked external directory).
-when_to_use: When the user says "transcribe handwritten notes", "process handwritten", or types /transcribe.
+when_to_use: When the user says "transcribe handwritten notes", "process handwritten", or types /kb-ingest:transcribe.
 allowed-tools: Read Write Bash(kb-ingest list-untranscribed) Bash(git *)
 disable-model-invocation: true
 ---

@@ -3,8 +3,8 @@ name: meeting
 description: >
   Spin up a blank meeting note scaffold in raw/meetings/ ready to fill in live during a meeting.
   Pre-fills frontmatter with today's date and current time, and opens the file in VSCode.
-  For post-hoc meeting structuring, use /capture meeting instead.
-when_to_use: When the user types /meeting or asks to start a meeting note for a live meeting.
+  For post-hoc meeting structuring, use /kb-capture:capture meeting instead.
+when_to_use: When the user types /kb-capture:meeting or asks to start a meeting note for a live meeting.
 allowed-tools: Read Write Bash(date *) Bash(code *) Bash(git *)
 disable-model-invocation: true
 argument-hint: <meeting title (optional)>
@@ -17,7 +17,7 @@ Spin up a blank meeting note scaffolded from the standard template, ready to fil
 $ARGUMENTS is optional: pass the meeting title to skip the prompt.
 
 This is for **live note-taking** — it drops an empty structured file at `raw/meetings/YYYY-MM-DD-<slug>.md` with frontmatter pre-filled using today's date and current time, and empty section headers ready to type into.
-Use `/capture meeting` instead for post-hoc structuring of unstructured notes or voice recap.
+Use `/kb-capture:capture meeting` instead for post-hoc structuring of unstructured notes or voice recap.
 
 ## 1. Get metadata
 
@@ -80,7 +80,7 @@ attendees: [Name1, Name2]      # or [] if user said skip
 
 ## Related Articles
 
-<!-- populated later via /compile or manual kb-search -->
+<!-- populated later via /kb:compile or manual kb-search -->
 
 ## Sources
 
@@ -90,7 +90,7 @@ attendees: [Name1, Name2]      # or [] if user said skip
 Fill in `<Title>`, the date/time values, and the attendees list.
 If the user said `skip` for attendees, leave the list empty (`attendees: []`) and replace the sample bullets under `## 👥 Attendees` with a single comment: `<!-- add as people join -->`.
 
-Do **not** use source provenance markers (`<!-- source: ... -->`) in this scaffold — those get added by `/compile` when the filled-in file is integrated into the wiki, or by `/capture meeting` if the user later runs it to restructure.
+Do **not** use source provenance markers (`<!-- source: ... -->`) in this scaffold — those get added by `/kb:compile` when the filled-in file is integrated into the wiki, or by `/kb-capture:capture meeting` if the user later runs it to restructure.
 
 ## 4. Open and report
 

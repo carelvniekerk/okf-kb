@@ -4,7 +4,7 @@ description: >
   Ingest a YouTube video — fetch raw materials, judge transcript quality (running MLX Whisper if
   auto-captions are unusable), extract key frames via ffmpeg, and write a structured discussion
   article in raw/videos/.
-  Does not commit — /compile integrates the article into the wiki.
+  Does not commit — /kb:compile integrates the article into the wiki.
 when_to_use: When the user provides a YouTube URL or says "ingest this video" or "transcribe this video".
 allowed-tools: Read Write Bash(kb-video *) Bash(mkdir *) Bash(mv *)
 disable-model-invocation: true
@@ -197,7 +197,7 @@ Tell the user:
 - Transcription method used + a one-line rationale
 - How many frames were kept and one-line on what they show
 - One-paragraph summary of what the article covers
-- Reminder that `/compile` will integrate it into the wiki
+- Reminder that `/kb:compile` will integrate it into the wiki
 
 ## Failure modes
 
@@ -210,6 +210,6 @@ Tell the user:
 
 - Don't dump the transcript into the article. Synthesise.
 - Don't put frames in `raw/images/` unless you're referencing them in the article.
-- Don't commit — the user runs `/compile` next.
+- Don't commit — the user runs `/kb:compile` next.
 - Don't skip the quality judgement.
 - Don't manually delete `video_scratch/<id>/` — use `kb-video cleanup`.

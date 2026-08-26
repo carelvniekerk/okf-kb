@@ -4,7 +4,7 @@ description: >
   Record a human sign-off on a wiki article — read it back against its sources, confirm it is
   faithful, and append an OKF `verified` entry to its frontmatter.
   This is the only way a `human:` actor is ever written.
-when_to_use: When the user says "verify", "sign off on", "review this article", or types /verify. Never invoke automatically.
+when_to_use: When the user says "verify", "sign off on", "review this article", or types /kb:verify. Never invoke automatically.
 allowed-tools: Read Edit Bash(kb-*) Bash(git *) Bash(date *)
 disable-model-invocation: true
 argument-hint: <wiki article path, or a directory to work through>

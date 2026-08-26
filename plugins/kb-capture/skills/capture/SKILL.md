@@ -14,7 +14,7 @@ argument-hint: "note | brief | meeting [path/to/notes.md]"
 
 Capture a voice note, daily brief, or meeting note. $ARGUMENTS is optional:
 - `note` — free-form note
-- `brief` — start-of-day daily brief (use `/update-brief` for mid-day updates)
+- `brief` — start-of-day daily brief (use `/kb-capture:update-brief` for mid-day updates)
 - `meeting [path]` — meeting note, with optional path to an existing markdown file of raw notes taken during the meeting
 
 This command handles spoken content (via Claude Code's voice mode), pasted transcripts (e.g. from the Claude mobile app), and — for meetings — a path to an existing markdown notes file.
@@ -168,7 +168,7 @@ These become `## Related Articles`.
 
 ### Step 5: Structure the meeting note
 
-Start from the `/meeting` scaffold — it is the canonical meeting-note outline.
+Start from the `/kb-capture:meeting` scaffold — it is the canonical meeting-note outline.
 Apply these modifications for the post-hoc capture case:
 
 **Frontmatter:**
@@ -388,7 +388,7 @@ If a carryover has slipped 3+ days, flag it and ask whether it should be dropped
 
 Path: `raw/daily-briefs/YYYY-MM-DD.md`.
 
-If `raw/daily-briefs/YYYY-MM-DD.md` already exists, stop and tell the user: **"Today's brief already exists — use `/update-brief` for mid-day additions."**
+If `raw/daily-briefs/YYYY-MM-DD.md` already exists, stop and tell the user: **"Today's brief already exists — use `/kb-capture:update-brief` for mid-day additions."**
 Do not overwrite.
 
 Otherwise write the full template:
@@ -463,7 +463,7 @@ _(Top 5 from <the `name` of every mailbox that returned>, last 48h, excluding pr
 <!-- /source -->
 ```
 
-For mid-day additions (mark off todos, add new items, log notes, evolve mood, refresh calendar/Gmail), use `/update-brief` — not this command.
+For mid-day additions (mark off todos, add new items, log notes, evolve mood, refresh calendar/Gmail), use `/kb-capture:update-brief` — not this command.
 
 ### Step 7: Commit
 
@@ -480,4 +480,4 @@ Do **not** offer to compile — daily briefs are not wiki material.
 
 The user can also tick `- [x]` directly in Obsidian — GitHub-flavored checkboxes are clickable there.
 No command needed for that.
-The next `/capture brief` run will pick up the current state of checkboxes when reviewing yesterday's file (Step 1).
+The next `/kb-capture:capture brief` run will pick up the current state of checkboxes when reviewing yesterday's file (Step 1).

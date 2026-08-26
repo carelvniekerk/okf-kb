@@ -4,7 +4,7 @@ description: >
   Run the full knowledge base compilation pipeline — transcribes handwritten notes, converts PDFs,
   detects new/modified/deleted sources, integrates each with type-dependent strategies
   (technical/discussion/experiment/meeting), updates INDEX.md, runs health checks, and commits.
-when_to_use: When the user says "compile", "update wiki", "process new sources", or types /compile.
+when_to_use: When the user says "compile", "update wiki", "process new sources", or types /kb:compile.
 allowed-tools: Read Write Edit Bash(kb-*) Bash(git *) Bash(grep *)
 disable-model-invocation: true
 ---
@@ -30,7 +30,7 @@ If any were converted, commit with `git add raw/ && git commit -m "ingest: conve
 ## 3. Detect all changes
 
 Compare against the **last compile**, not the working tree.
-`/ingest`, `/capture`, `/transcribe` and `/video` all commit the raw source and *then* offer to compile, so by the time compile runs the working tree is clean and a `HEAD` diff sees nothing.
+`/kb-ingest:ingest`, `/kb-capture:capture`, `/kb-ingest:transcribe` and `/kb-video:video` all commit the raw source and *then* offer to compile, so by the time compile runs the working tree is clean and a `HEAD` diff sees nothing.
 
 ```bash
 LAST=$(git log -1 --format=%H --grep='^compile:')
@@ -99,7 +99,7 @@ Daily briefs are partially ephemeral — they contain personal/transient content
 
 ### 5.0b. Pre-process video sources (if applicable)
 
-Sources under `raw/videos/<slug>-<id>.md` come from the `/video` skill and are already a fully-structured article.
+Sources under `raw/videos/<slug>-<id>.md` come from the `/kb-video:video` skill and are already a fully-structured article.
 Treat them as a **promote**, not a re-synthesis:
 
 - Keep the source's tags, type, and `source_type` as the basis for the wiki article's frontmatter.
@@ -161,7 +161,7 @@ Additionally:
 - Stamp `generated` with your own model id, an ISO 8601 UTC timestamp, `skill: compile@kb-<version>` (the `version` in this plugin's `.claude-plugin/plugin.json`), and `commit` once committed. A bundle carrying its own in-repo copy of this skill instead stamps `compile@<sha>`, from `git log -1 --format=%h -- .claude/skills/compile/` — either way the point is that a hallucination traces to the exact producer version that emitted it.
 - Leave `status` at `stable` unless the article is genuinely provisional (`draft`) or superseded (`deprecated`).
 - Add `stale_after` if the content is pinned to a moving target — library versions, build steps, a project's lifespan.
-- **Never write `verified`.** Absent means unverified, which is the honest state. Only `/verify` may add it.
+- **Never write `verified`.** Absent means unverified, which is the honest state. Only `/kb:verify` may add it.
 - Set `date_updated` to today.
 - Wrap the main content in source provenance markers:
 
@@ -249,7 +249,7 @@ kb-index --stamp-compiled
 
 This rewrites `wiki/INDEX.md` and every per-directory `INDEX.md`, recomputing the article count and unique source count. Hand-maintaining those counters is what let the old `sources-41` badge drift away from every real total.
 
-`--stamp-compiled` moves the compile-date badge to today. **This skill is the only caller that may pass it.** Every other invocation — the pre-commit hook, `/verify`, a manual run — leaves the badge as it stands, because the badge records when the wiki was last compiled, not when `kb-index` last ran. A bare `kb-index` preserves it.
+`--stamp-compiled` moves the compile-date badge to today. **This skill is the only caller that may pass it.** Every other invocation — the pre-commit hook, `/kb:verify`, a manual run — leaves the badge as it stands, because the badge records when the wiki was last compiled, not when `kb-index` last ran. A bare `kb-index` preserves it.
 
 The health badge is emitted as `unknown` by default and is only set to passing in step 7.
 

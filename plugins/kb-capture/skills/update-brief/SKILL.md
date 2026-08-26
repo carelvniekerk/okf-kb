@@ -3,8 +3,8 @@ name: update-brief
 description: >
   Update today's daily brief in place — refreshes calendar and Gmail sections, and optionally
   patches in new spoken or pasted content (done tasks, new todos, notes, mood).
-  Use mid-day. For starting a fresh day, use /capture brief.
-when_to_use: When the user types /update-brief or asks to update, refresh, or add to today's daily brief.
+  Use mid-day. For starting a fresh day, use /kb-capture:capture brief.
+when_to_use: When the user types /kb-capture:update-brief or asks to update, refresh, or add to today's daily brief.
 allowed-tools: Read Write Edit Bash(git *) mcp__claude_ai_Google_Calendar__list_events mcp__claude_ai_Gmail__search_threads mcp__claude_ai_Microsoft_365__outlook_calendar_search mcp__claude_ai_Microsoft_365__outlook_email_search
 disable-model-invocation: true
 ---
@@ -14,15 +14,15 @@ disable-model-invocation: true
 Update today's daily brief in place: refresh calendar + Gmail, and optionally patch in new spoken/pasted content (done tasks, new todos, notes, mood).
 
 Use this mid-day.
-For starting a fresh day, use `/capture brief`.
+For starting a fresh day, use `/kb-capture:capture brief`.
 
 ## Ground rules
 
 - **Never fabricate content.**
-Same rule as `/capture`: only restructure and clean the user's words.
+Same rule as `/kb-capture:capture`: only restructure and clean the user's words.
 External data (calendar, Gmail) is agent-fetched and clearly attributed.
 - Edit the existing file **in place** — do not append session blocks.
-`/update-brief` is the single way to add mid-day content.
+`/kb-capture:update-brief` is the single way to add mid-day content.
 - One sentence per line in body content.
 - Commit after saving with `brief: update YYYY-MM-DD`.
 
@@ -30,7 +30,7 @@ External data (calendar, Gmail) is agent-fetched and clearly attributed.
 
 Look for `raw/daily-briefs/YYYY-MM-DD.md` for today's date.
 
-- If it does **not** exist, stop and tell the user: **"No brief for today yet — run `/capture brief` first."**
+- If it does **not** exist, stop and tell the user: **"No brief for today yet — run `/kb-capture:capture brief` first."**
 Do not create a new brief from this command.
 
 Read the existing file fully before doing anything else.
@@ -47,7 +47,7 @@ Wait for the answer.
 
 ## 3. Always: refresh calendar + Gmail
 
-Use the **calendar set** configured in `okf.toml`'s `[[capture.calendars]]` — the same set `/kb:capture` reads. Fan out one call per entry (`list_events` for `provider = "google"`, `outlook_calendar_search` for `provider = "microsoft"`), merge by start time, dedupe.
+Use the **calendar set** configured in `okf.toml`'s `[[capture.calendars]]` — the same set `/kb-capture:capture` reads. Fan out one call per entry (`list_events` for `provider = "google"`, `outlook_calendar_search` for `provider = "microsoft"`), merge by start time, dedupe.
 Use the same rendering rules (prefix non-primary timed events with `[<calendar name>]`, render birthdays as `🎂 **<Name>'s birthday**`, holidays as `🎉 **<Holiday>**`).
 
 In parallel:
@@ -55,7 +55,7 @@ In parallel:
 2. **Calendar — tomorrow important:** fan-out fetch for tomorrow, then filter to external meetings, first meeting of the day, multi-hour / multi-attendee blocks, birthdays of people the user knows personally, German holidays that affect the working day, high-priority items.
    Skip routine self-blocked focus time unless it's the only item.
 3. **Gmail — top 5 from last 2 days:** `mcp__claude_ai_Gmail__search_threads` with `newer_than:2d -category:promotions -category:social`.
-4. **Every other configured mailbox — same window:** one call per `[[capture.mailboxes]]` entry, as `/kb:capture` describes. Tag each line with the entry's `name`, matching `/kb:capture`.
+4. **Every other configured mailbox — same window:** one call per `[[capture.mailboxes]]` entry, as `/kb-capture:capture` describes. Tag each line with the entry's `name`, matching `/kb-capture:capture`.
    Pick 5 signal-heavy threads.
 
 If a single calendar fails, keep the others and note the miss in the rendered section.

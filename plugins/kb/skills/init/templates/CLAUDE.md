@@ -280,7 +280,9 @@ Standard section header emojis: `## 🔗 Prerequisites`, `## 🎯 Key Takeaways`
 
 ## Skills
 
-Provided by the `kb` plugin (plus `kb-ingest` and `kb-video` if installed):
+Provided by the `kb` plugin, and by `kb-ingest`, `kb-video` and `kb-capture`
+where those are installed. A skill is addressed by the plugin that ships it, so
+capture is `/kb-capture:capture`, not `/kb:capture`:
 
 | Skill | Purpose |
 |---|---|

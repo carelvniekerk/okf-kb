@@ -101,9 +101,9 @@ substitute the placeholders:
 | `{{DESCRIPTION}}` | One line on what this bundle covers, also from question (1). It is rendered under the root index badges, so write it to be read on its own. |
 | `{{SLUG}}` | The directory name, for the layout diagram |
 | `{{HUMAN_ID}}` | The actor id from question (2) |
-| `{{INGEST_SKILLS}}` / `{{INGEST_TOOLS}}` | Rows for `/kb:ingest`, `/kb:transcribe` and `kb-ingest` — only if the `kb-ingest` plugin is enabled |
-| `{{VIDEO_SKILLS}}` / `{{VIDEO_TOOLS}}` | Rows for `/kb:video` and `kb-video` — only if `kb-video` is enabled |
-| `{{CAPTURE_SKILLS}}` | Rows for `/kb:capture`, `/kb:meeting`, `/kb:update-brief` — only if `kb-capture` is enabled |
+| `{{INGEST_SKILLS}}` / `{{INGEST_TOOLS}}` | Rows for `/kb-ingest:ingest`, `/kb-ingest:transcribe` and `kb-ingest` — only if the `kb-ingest` plugin is enabled |
+| `{{VIDEO_SKILLS}}` / `{{VIDEO_TOOLS}}` | Rows for `/kb-video:video` and `kb-video` — only if `kb-video` is enabled |
+| `{{CAPTURE_SKILLS}}` | Rows for `/kb-capture:capture`, `/kb-capture:meeting`, `/kb-capture:update-brief` — only if `kb-capture` is enabled |
 | `{{CAPTURE_TASKS}}` | The Capture and Meeting VS Code tasks — only if `kb-capture` is enabled |
 | `{{FOAM_TASK}}` | The graph-view task — only if the user uses the Foam extension |
 
@@ -122,14 +122,14 @@ refuses to load — check the result parses before moving on.
         {
             "label": "🎙️ Capture",
             "type": "shell",
-            "command": "claude /kb:capture",
+            "command": "claude /kb-capture:capture",
             "group": { "kind": "build", "isDefault": false },
             "presentation": { "reveal": "always", "focus": false, "panel": "shared" }
         },
         {
             "label": "👥 Meeting",
             "type": "shell",
-            "command": "claude /kb:meeting",
+            "command": "claude /kb-capture:meeting",
             "group": { "kind": "build", "isDefault": false },
             "presentation": { "reveal": "always", "focus": false, "panel": "shared" }
         }
