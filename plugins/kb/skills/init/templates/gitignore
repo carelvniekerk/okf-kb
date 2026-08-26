@@ -1,0 +1,18 @@
+# Transient Q&A answers and health reports
+output
+output/
+
+# Scratch space for intermediate work
+research_scratch
+research_scratch/
+video_scratch
+
+# Environment
+.envrc
+.cleanup
+
+# OS
+.DS_Store
+
+# Obsidian
+.obsidian/

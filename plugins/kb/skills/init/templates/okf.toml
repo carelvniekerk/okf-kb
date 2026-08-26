@@ -1,0 +1,48 @@
+# Marks this directory as a knowledge-base root and describes its layout.
+# Every kb-* tool walks up from the working directory looking for this file, so
+# a command can be run from anywhere inside the bundle.
+#
+# Every key has a default matching the canonical layout, so this file may be
+# almost empty. Add to it as the wiki grows a real structure.
+
+[bundle]
+title = "{{TITLE}}"
+okf_version = "0.2"
+kb_format = "1.0"
+
+# wiki / raw / output are the canonical names. Uncomment and edit only if this
+# bundle uses different ones.
+# [paths]
+# wiki = "wiki"
+# raw = "raw"
+# output = "output"
+
+# Display title per wiki directory. Nested keys are wiki-relative paths, and
+# must be quoted: "projects/my-project" = "🚀 My Project"
+[directories]
+
+# How the root index groups those directories, in this order. A directory
+# claimed by no group still renders, under a trailing "📁 Unfiled" heading.
+# [[groups]]
+# title = "🔧 Tools"
+# directories = ["tools"]
+
+# --- kb-capture plugin (only if installed) ----------------------------------
+# Which calendars and mailboxes the daily brief pulls from. Nothing here is
+# baked into the skill; an absent [capture] table means the brief is built from
+# your own input alone.
+#
+# [capture]
+# timezone = "Europe/Berlin"
+#
+# [[capture.calendars]]
+# name = "Primary"                    # label used in the brief and failure notes
+# provider = "google"                 # google | microsoft
+# id = "you@example.com"              # google only; omit for microsoft
+# # event_type_filter = ["birthday"]  # optional, google only
+# # drop_subject_prefix = "Daily /"   # optional: recurring noise to exclude
+#
+# [[capture.mailboxes]]
+# name = "Gmail"                      # tag shown against each inbox line
+# provider = "gmail"                  # gmail | outlook
+# # folder = "Inbox"                  # outlook only

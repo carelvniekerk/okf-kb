@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "kb-video",
+  "version": "0.1.0",
+  "description": "YouTube ingestion for an Open Knowledge Format knowledge base. Stages a video's metadata, captions, audio and frames, judges transcript quality and falls back to MLX Whisper, then writes a structured discussion article with selected frames. Needs the okf-kb package's [video] extra (yt-dlp, mlx-whisper) and ffmpeg on the system.",
+  "author": {
+    "name": "Carel van Niekerk",
+    "email": "code@carelvanniekerk.com",
+    "url": "https://github.com/carelvniekerk"
+  },
+  "homepage": "https://github.com/carelvniekerk/okf-kb",
+  "repository": "https://github.com/carelvniekerk/okf-kb",
+  "license": "MIT",
+  "keywords": [
+    "knowledge-base",
+    "okf",
+    "youtube",
+    "whisper",
+    "video"
+  ]
+}

@@ -1,0 +1,49 @@
+# This repo is content, not code: raw/ sources and the wiki/ bundle. The kb-*
+# tooling is installed with `uv tool install`, so there is no project
+# environment here and nothing Python to lint, type-check or test.
+
+default_install_hook_types:
+    - pre-commit
+    - post-checkout
+    - post-merge
+    - post-rewrite
+
+repos:
+    - repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v6.0.0
+      hooks:
+          - id: trailing-whitespace
+          - id: end-of-file-fixer
+            exclude: "^.obsidian/"
+          - id: check-yaml
+          - id: check-toml
+          - id: check-added-large-files
+            args: ["--maxkb=2048"]
+          - id: check-merge-conflict
+          - id: detect-private-key
+
+    - repo: local
+      hooks:
+          # Regenerate every INDEX.md from article frontmatter, so the indexes
+          # can never drift from the wiki.
+          #
+          # The health badge is only stamped as passing when kb-health actually
+          # exits 0 — hence the conditional rather than a plain kb-index call.
+          #
+          # Neither branch passes --stamp-compiled, so the compile-date badge is
+          # carried over from the committed index. This hook fires on every
+          # commit; only /kb:compile may move that date.
+          - id: wiki-index
+            name: wiki-index
+            language: system
+            entry: bash -c 'if kb-health >/dev/null 2>&1; then kb-index --health-passing; else kb-index; fi'
+            pass_filenames: false
+            always_run: true
+
+          # Health check — writes a timestamped report to output/, never blocks.
+          - id: wiki-health
+            name: wiki-health
+            language: system
+            entry: kb-health --no-fail
+            pass_filenames: false
+            always_run: true

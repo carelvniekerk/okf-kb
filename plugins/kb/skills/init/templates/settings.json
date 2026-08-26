@@ -1,0 +1,26 @@
+{
+    "permissions": {
+        "allow": [
+            "Bash(kb-search:*)",
+            "Bash(kb-stats:*)",
+            "Bash(kb-index:*)",
+            "Bash(kb-health:*)",
+            "Bash(kb-provenance:*)",
+            "Bash(kb-export:*)",
+            "Bash(kb-ingest:*)",
+            "Bash(kb-video:*)",
+            "Skill(kb:wiki-search)"
+        ]
+    },
+    "enabledPlugins": {
+        "kb@okf-kb": true
+    },
+    "extraKnownMarketplaces": {
+        "okf-kb": {
+            "source": {
+                "source": "github",
+                "repo": "carelvniekerk/okf-kb"
+            }
+        }
+    }
+}

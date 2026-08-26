@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "okf-kb",
+  "description": "Skills for running an agent-maintained Open Knowledge Format knowledge base: initialise or adopt a bundle, compile sources into a wiki, and keep it healthy. Pairs with the okf-kb Python package, which provides the kb-* tools.",
+  "owner": {
+    "name": "Carel van Niekerk",
+    "email": "code@carelvanniekerk.com",
+    "url": "https://github.com/carelvniekerk"
+  },
+  "plugins": [
+    {
+      "name": "kb",
+      "source": "./plugins/kb",
+      "category": "knowledge-management",
+      "tags": [
+        "knowledge-base",
+        "okf",
+        "wiki",
+        "compile",
+        "provenance"
+      ]
+    },
+    {
+      "name": "kb-ingest",
+      "source": "./plugins/kb-ingest",
+      "category": "knowledge-management",
+      "tags": [
+        "knowledge-base",
+        "okf",
+        "ingestion",
+        "arxiv",
+        "transcription"
+      ]
+    },
+    {
+      "name": "kb-video",
+      "source": "./plugins/kb-video",
+      "category": "knowledge-management",
+      "tags": [
+        "knowledge-base",
+        "okf",
+        "youtube",
+        "whisper",
+        "transcription"
+      ]
+    },
+    {
+      "name": "kb-capture",
+      "source": "./plugins/kb-capture",
+      "category": "knowledge-management",
+      "tags": [
+        "knowledge-base",
+        "okf",
+        "daily-brief",
+        "meeting-notes",
+        "calendar"
+      ]
+    }
+  ]
+}
