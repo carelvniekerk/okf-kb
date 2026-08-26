@@ -103,9 +103,48 @@ substitute the placeholders:
 | `{{INGEST_SKILLS}}` / `{{INGEST_TOOLS}}` | Rows for `/kb:ingest`, `/kb:transcribe` and `kb-ingest` — only if the `kb-ingest` plugin is enabled |
 | `{{VIDEO_SKILLS}}` / `{{VIDEO_TOOLS}}` | Rows for `/kb:video` and `kb-video` — only if `kb-video` is enabled |
 | `{{CAPTURE_SKILLS}}` | Rows for `/kb:capture`, `/kb:meeting`, `/kb:update-brief` — only if `kb-capture` is enabled |
+| `{{CAPTURE_TASKS}}` | The Capture and Meeting VS Code tasks — only if `kb-capture` is enabled |
+| `{{FOAM_TASK}}` | The graph-view task — only if the user uses the Foam extension |
 
 A block for a plugin that is not enabled is replaced with nothing, not left as a
 placeholder and not left as a row pointing at a skill the user does not have.
+
+`{{CAPTURE_TASKS}}` and `{{FOAM_TASK}}` sit *inside* a JSON array, so each
+expands to a **leading comma then the objects**, and to the empty string when
+unused. Getting that wrong yields a trailing comma and a tasks file VS Code
+refuses to load — check the result parses before moving on.
+
+`{{CAPTURE_TASKS}}`:
+
+```json
+,
+        {
+            "label": "🎙️ Capture",
+            "type": "shell",
+            "command": "claude /kb:capture",
+            "group": { "kind": "build", "isDefault": false },
+            "presentation": { "reveal": "always", "focus": false, "panel": "shared" }
+        },
+        {
+            "label": "👥 Meeting",
+            "type": "shell",
+            "command": "claude /kb:meeting",
+            "group": { "kind": "build", "isDefault": false },
+            "presentation": { "reveal": "always", "focus": false, "panel": "shared" }
+        }
+```
+
+`{{FOAM_TASK}}`:
+
+```json
+,
+        {
+            "label": "🕸️ Graph",
+            "type": "vscode-command",
+            "command": "foam-vscode.show-graph",
+            "presentation": { "reveal": "never", "focus": false, "panel": "shared" }
+        }
+```
 
 | Template | Destination | Notes |
 |---|---|---|
@@ -114,6 +153,23 @@ placeholder and not left as a row pointing at a skill the user does not have.
 | `templates/settings.json` | `./.claude/settings.json` | Plugin + marketplace + tool permissions |
 | `templates/gitignore` | `./.gitignore` | Note the missing dot on the source name |
 | `templates/pre-commit-config.yaml` | `./.pre-commit-config.yaml` | Only if the user wants hooks |
+| `templates/vscode-settings.json` | `./.vscode/settings.json` | Folder icons, excludes, markdown/spell settings |
+| `templates/vscode-tasks.json` | `./.vscode/tasks.json` | Health, Compile, Reindex, Stats, plus conditional tasks |
+
+The two `.vscode/` files are editor conveniences, not part of the bundle. Ask
+once whether the user wants them and skip both if not — do not write editor
+config for someone who did not ask for it. If they use VS Code, they are worth
+having: the tasks put Health and Compile on ⇧⌘B, and the folder-icon
+associations make `raw/` and `wiki/` visually distinct in the tree.
+
+The icon associations name folders a bundle may not have (`handwritten/`,
+`daily-briefs/`, `video_scratch/`). That is deliberate and harmless — an
+association for a folder that does not exist simply never matches — so the file
+needs no per-plugin conditioning. Only the *tasks* do, since a task invoking a
+skill the user does not have would fail when run.
+
+If the user does not use the Foam extension, drop `{{FOAM_TASK}}`; its
+`foam.files.exclude` setting is inert without the extension and can stay.
 
 Then create the directory skeleton:
 

@@ -1,0 +1,34 @@
+{
+    "material-icon-theme.folders.associations": {
+        "raw": "resource",
+        "wiki": "graphql",
+        "output": "temp",
+        "papers": "lib",
+        "clippings": "import",
+        "notes": "resource",
+        "research": "review",
+        "transcriptions": "resource",
+        "handwritten": "mock",
+        "daily-briefs": "skills",
+        "meetings": "meta",
+        "videos": "video",
+        "research_scratch": "helper",
+        "video_scratch": "video"
+    },
+    "files.exclude": {
+        "**/output": true,
+        "**/research_scratch": true,
+        "**/video_scratch": true
+    },
+    "foam.files.exclude": [
+        "**/README.md",
+        "**/CLAUDE.md",
+        "**/.claude/**",
+        "**/output/**",
+        "**/research_scratch/**"
+    ],
+    "markdown.validate.enabled": false,
+    "cSpell.enabledFileTypes": {
+        "markdown": true
+    }
+}

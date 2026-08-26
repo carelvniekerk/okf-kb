@@ -180,6 +180,18 @@ If a `CLAUDE.md` already exists, **do not overwrite it.** Show the user what the
 template would add, and merge only what they accept. Their existing instructions
 may encode conventions you have not seen.
 
+The same applies to `.vscode/settings.json` and `.vscode/tasks.json`, which
+`/kb:init` also writes from `../init/templates/`. Offer them, and where a file is
+already present **merge rather than replace** — an adopted folder's editor config
+usually carries settings that have nothing to do with this bundle. Add the
+folder-icon associations and the Health / Compile / Reindex / Stats tasks
+alongside what is there; do not drop anything the user already had.
+
+Watch for tasks that predate the adoption and no longer work — one invoking a
+tool through a project environment this bundle no longer has, or a bare
+`/compile` where the skills are now namespaced `/kb:compile`. Point those out
+rather than silently leaving them broken.
+
 ## 8. Log, commit, hand over
 
 Append to `wiki/log.md` (creating it if absent):

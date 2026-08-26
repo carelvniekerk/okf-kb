@@ -1,0 +1,33 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "🩺 Health",
+            "type": "shell",
+            "command": "kb-health",
+            "group": { "kind": "build", "isDefault": true },
+            "presentation": { "reveal": "always", "focus": false, "panel": "shared" }
+        },
+        {
+            "label": "📚 Compile",
+            "type": "shell",
+            "command": "claude /kb:compile",
+            "group": { "kind": "build", "isDefault": false },
+            "presentation": { "reveal": "always", "focus": false, "panel": "shared" }
+        },
+        {
+            "label": "📇 Reindex",
+            "type": "shell",
+            "command": "kb-index",
+            "group": { "kind": "build", "isDefault": false },
+            "presentation": { "reveal": "always", "focus": false, "panel": "shared" }
+        },
+        {
+            "label": "📊 Stats",
+            "type": "shell",
+            "command": "kb-stats",
+            "group": { "kind": "build", "isDefault": false },
+            "presentation": { "reveal": "always", "focus": false, "panel": "shared" }
+        }{{CAPTURE_TASKS}}{{FOAM_TASK}}
+    ]
+}
