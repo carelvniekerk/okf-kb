@@ -172,6 +172,12 @@ skill the user does not have would fail when run.
 If the user does not use the Foam extension, drop `{{FOAM_TASK}}`; its
 `foam.files.exclude` setting is inert without the extension and can stay.
 
+Copy both files as **text**, and keep every emoji literal. A JSON serialiser
+that escapes non-ASCII rewrites `"🩺 Health"` as `"\ud83e\ude7a Health"` — VS
+Code still renders the icon, but the file becomes unreadable and nobody editing
+it later can tell one task from another. In a tasks file the emoji *is* the
+interface, so never round-trip these through a JSON dump.
+
 Then create the directory skeleton:
 
 ```bash

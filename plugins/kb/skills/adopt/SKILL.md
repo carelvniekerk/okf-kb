@@ -207,10 +207,18 @@ usually carries settings that have nothing to do with this bundle. Add the
 folder-icon associations and the Health / Compile / Reindex / Stats tasks
 alongside what is there; do not drop anything the user already had.
 
-Watch for tasks that predate the adoption and no longer work — one invoking a
-tool through a project environment this bundle no longer has, or a bare
-`/compile` where the skills are now namespaced `/kb:compile`. Point those out
-rather than silently leaving them broken.
+Watch for tasks that predate the adoption and no longer work. Two kinds recur:
+
+- A command invoking a tool through a project environment this bundle no longer
+  has — `uv run kb-health` where `kb-health` is now installed as a tool.
+- A bare `/compile`, `/capture` or `/meeting` from a local skill copy, where the
+  skills now arrive from a plugin and are namespaced `/kb:compile`, `/kb:capture`,
+  `/kb:meeting`. A task pointing at a skill that no longer exists fails silently
+  until someone runs it, so rewrite these rather than only reporting them.
+
+While you are in the file, de-escape any emoji written as `\uXXXX` surrogate
+pairs. VS Code renders them either way, but a label the user cannot read in the
+source is a label they cannot maintain.
 
 ## 8. Log, commit, hand over
 
