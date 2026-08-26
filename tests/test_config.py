@@ -245,3 +245,13 @@ def test_relative_passes_through_a_path_outside_the_bundle(tmp_path):
     cfg = config.load_from(_bundle(tmp_path / "bundle"))
     outside = (tmp_path / "elsewhere" / "a.md").resolve()
     assert cfg.relative(outside) == outside
+
+
+def test_description_defaults_to_something_subject_neutral(tmp_path):
+    """The index intro named one bundle's subjects. It belongs in config."""
+    assert config.load_from(_bundle(tmp_path)).description == config.DEFAULT_DESCRIPTION
+
+
+def test_description_is_read_from_the_bundle(tmp_path):
+    root = _bundle(tmp_path, '[bundle]\ndescription = "Notes on Postgres."\n')
+    assert config.load_from(root).description == "Notes on Postgres."

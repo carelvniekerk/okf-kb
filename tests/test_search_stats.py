@@ -18,7 +18,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from okf_kb import ingest, search, stats
+from okf_kb import ingest, okf, provenance, search, stats
 
 # --------------------------------------------------------------------------
 # search.py — frontmatter parsing
@@ -394,3 +394,28 @@ def test_ingest_resolves_the_raw_zone_from_a_nested_directory(tmp_path, monkeypa
 
     assert result.exit_code == 0
     assert str(tmp_path / "raw" / "handwritten") in result.output
+
+
+# -- the raw zone's name is configurable -------------------------------------
+#
+# A bundle adopted from an existing folder often calls its zones something else.
+# Matching a hardcoded "raw/" made `kb-provenance migrate` find nothing there and
+# report every article as already declaring its sources — a false clean, on the
+# exact command whose job is to find what is missing.
+
+
+def test_source_links_are_parsed_from_a_renamed_raw_zone(tmp_path):
+    article = tmp_path / "articles" / "a.md"
+    article.parent.mkdir(parents=True)
+    article.write_text(
+        "# A\n\n## Sources\n\n- [Talk](../notes/talk.md)\n",
+        encoding="utf-8",
+    )
+    assert provenance._parse_source_links(article.read_text(), article, "notes")
+    assert provenance._parse_source_links(article.read_text(), article, "raw") == []
+
+
+def test_source_zone_honours_a_renamed_raw_zone():
+    assert okf.source_zone("notes/papers/x.md", "notes") == "papers"
+    assert okf.source_zone("notes/papers/x.md") == ""
+    assert okf.source_zone("raw/papers/x.md") == "papers"

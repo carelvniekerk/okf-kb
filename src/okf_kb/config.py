@@ -46,6 +46,10 @@ DEFAULT_OUTPUT_DIR = "output"
 #: Default bundle title, used as the root index's H1.
 DEFAULT_TITLE = "🧠 Knowledge Base"
 
+#: Default one-line description, rendered under the root index badges. Kept
+#: subject-neutral: a bundle's own subject belongs in its config, not here.
+DEFAULT_DESCRIPTION = "A knowledge base compiled from curated sources."
+
 #: Spec versions a bundle is assumed to target when it declares none.
 DEFAULT_OKF_VERSION = "0.2"
 DEFAULT_KB_FORMAT = "1.0"
@@ -80,6 +84,7 @@ class Config:
     raw: Path
     output: Path
     title: str = DEFAULT_TITLE
+    description: str = DEFAULT_DESCRIPTION
     okf_version: str = DEFAULT_OKF_VERSION
     kb_format: str = DEFAULT_KB_FORMAT
     groups: tuple[Group, ...] = ()
@@ -189,6 +194,7 @@ def load_from(root: Path) -> Config:
         raw=_resolve(root, paths, "raw", DEFAULT_RAW_DIR, path),
         output=_resolve(root, paths, "output", DEFAULT_OUTPUT_DIR, path),
         title=_string(bundle, "title", DEFAULT_TITLE, path),
+        description=_string(bundle, "description", DEFAULT_DESCRIPTION, path),
         okf_version=_string(bundle, "okf_version", DEFAULT_OKF_VERSION, path),
         kb_format=_string(bundle, "kb_format", DEFAULT_KB_FORMAT, path),
         groups=_groups(raw, path),

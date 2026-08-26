@@ -25,8 +25,43 @@ from okf_kb.frontmatter import is_article
 
 app = typer.Typer(help="Source provenance tracking for the knowledge base.")
 
-# Pattern for markdown links in ## Sources section pointing to raw/
-_SOURCE_LINK_RE = re.compile(r"\[([^\]]+)\]\(((?:\.\.\/)*raw\/[^)]+)\)")
+
+def _raw_zone_name(explicit_wiki: Path | None = None) -> str:
+    """Return the bundle's raw-zone directory name.
+
+    Args:
+        explicit_wiki: The ``--wiki-dir`` the caller passed, if any. When set,
+            the command was pointed somewhere explicitly and may not be inside a
+            bundle at all, so fall back to the conventional name.
+
+    Returns:
+        The configured raw directory's name, or ``"raw"`` outside a bundle.
+
+    """
+    if explicit_wiki is not None:
+        return "raw"
+    try:
+        return config.load().raw.name
+    except config.ConfigError:
+        return "raw"
+
+
+def _source_link_re(raw_name: str) -> re.Pattern[str]:
+    """Build the pattern matching ## Sources links into the raw zone.
+
+    The zone's directory name is configurable, so this cannot be a module
+    constant: a bundle that calls its sources ``notes/`` would match nothing
+    against a hardcoded ``raw/`` and read as having declared everything.
+
+    Args:
+        raw_name: Directory name of the raw zone, relative to the bundle root.
+
+    Returns:
+        A compiled pattern whose second group is the link target.
+
+    """
+    escaped = re.escape(raw_name)
+    return re.compile(rf"\[([^\]]+)\]\(((?:\.\.\/)*{escaped}\/[^)]+)\)")
 
 
 def _declared_sources(text: str) -> list[str]:
@@ -47,19 +82,25 @@ def _declared_sources(text: str) -> list[str]:
     return [item.strip() for item in frontmatter.source_resources(data)]
 
 
-def _parse_source_links(text: str, article_path: Path) -> list[str]:
-    """Extract raw/ source paths from the ## Sources section markdown links.
+def _parse_source_links(
+    text: str,
+    article_path: Path,
+    raw_name: str = "raw",
+) -> list[str]:
+    """Extract raw-zone source paths from the ## Sources section links.
 
-    Falls back to this when source_files frontmatter is not present.
+    Falls back to this when source provenance is not declared in frontmatter.
 
     Args:
         text: Full markdown text.
         article_path: Path to the article file (for resolving relative links).
+        raw_name: Directory name of the raw zone.
 
     Returns:
-        List of raw/ paths found in Sources section links.
+        Paths found in Sources section links, root-relative where possible.
 
     """
+    pattern = _source_link_re(raw_name)
     sources: list[str] = []
     in_sources = False
     for line in text.splitlines():
@@ -70,7 +111,7 @@ def _parse_source_links(text: str, article_path: Path) -> list[str]:
             break
         if not in_sources:
             continue
-        for match in _SOURCE_LINK_RE.finditer(line):
+        for match in pattern.finditer(line):
             raw_link = match.group(2)
             # Resolve relative path to get a normalized raw/ path
             resolved = (article_path.parent / unquote(raw_link)).resolve()
@@ -84,11 +125,13 @@ def _parse_source_links(text: str, article_path: Path) -> list[str]:
 
 def build_provenance_map(
     wiki_dir: Path,
+    raw_name: str = "raw",
 ) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
     """Build bidirectional mapping between raw sources and wiki articles.
 
     Args:
         wiki_dir: Path to the wiki directory.
+        raw_name: Directory name of the raw zone, for parsing body links.
 
     Returns:
         Tuple of (raw_to_wiki, wiki_to_raw) dicts.
@@ -106,7 +149,7 @@ def build_provenance_map(
         # Try frontmatter first, fall back to Sources section links
         source_paths = _declared_sources(text)
         if not source_paths:
-            source_paths = _parse_source_links(text, md_file)
+            source_paths = _parse_source_links(text, md_file, raw_name)
 
         if source_paths:
             wiki_to_raw[article_path] = source_paths
@@ -233,8 +276,9 @@ def map_cmd(
     ] = False,
 ) -> None:
     """Show the bidirectional mapping between raw sources and wiki articles."""
+    raw_name = _raw_zone_name(wiki_dir)
     wiki_dir = config.resolve_dir(wiki_dir, "wiki")
-    raw_to_wiki, wiki_to_raw = build_provenance_map(wiki_dir)
+    raw_to_wiki, wiki_to_raw = build_provenance_map(wiki_dir, raw_name)
 
     if json_output:
         typer.echo(
@@ -291,8 +335,9 @@ def affected(
     ] = False,
 ) -> None:
     """Report wiki articles affected by deleted raw sources."""
+    raw_name = _raw_zone_name(wiki_dir)
     wiki_dir = config.resolve_dir(wiki_dir, "wiki")
-    raw_to_wiki, wiki_to_raw = build_provenance_map(wiki_dir)
+    raw_to_wiki, wiki_to_raw = build_provenance_map(wiki_dir, raw_name)
 
     affected_articles: dict[str, dict] = {}
 
@@ -398,9 +443,12 @@ def migrate(
     Does not modify files. Full migration of an article to the OKF schema is
     :func:`okf_kb.okf.migrate`; this command only surfaces the gap.
     """
-    wiki_dir = config.resolve_dir(wiki_dir, "wiki")
+    cfg_wiki = config.resolve_dir(wiki_dir, "wiki")
+    raw_name = _raw_zone_name(wiki_dir)
+    wiki_dir = cfg_wiki
     console = Console()
     found_any = False
+    undeclared: list[Path] = []
 
     for md_file in sorted(wiki_dir.rglob("*.md")):
         if not is_article(md_file):
@@ -412,8 +460,9 @@ def migrate(
         if existing:
             continue  # Provenance already declared
 
-        source_paths = _parse_source_links(text, md_file)
+        source_paths = _parse_source_links(text, md_file, raw_name)
         if not source_paths:
+            undeclared.append(md_file)
             continue
 
         found_any = True
@@ -425,8 +474,19 @@ def migrate(
 
     if not found_any:
         console.print(
-            "[green]Every article declares its sources in frontmatter.[/green]",
+            "[green]No article has body sources missing from frontmatter.[/green]",
         )
+    if undeclared:
+        # Distinct from the line above: these declare nothing *and* have no
+        # `## Sources` section to recover from, so migration cannot help them.
+        # Reporting them as clean is how an adopted bundle looks finished when
+        # none of its provenance has been written yet.
+        console.print(
+            f"\n[yellow]{len(undeclared)} article(s) declare no sources and have "
+            f"no `## Sources` section to recover from:[/yellow]",
+        )
+        for md_file in undeclared:
+            console.print(f"    - {md_file.name}")
 
 
 if __name__ == "__main__":

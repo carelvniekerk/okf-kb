@@ -98,6 +98,7 @@ substitute the placeholders:
 | Placeholder | Filled with |
 |---|---|
 | `{{TITLE}}` | The bundle title from question (1) |
+| `{{DESCRIPTION}}` | One line on what this bundle covers, also from question (1). It is rendered under the root index badges, so write it to be read on its own. |
 | `{{SLUG}}` | The directory name, for the layout diagram |
 | `{{HUMAN_ID}}` | The actor id from question (2) |
 | `{{INGEST_SKILLS}}` / `{{INGEST_TOOLS}}` | Rows for `/kb:ingest`, `/kb:transcribe` and `kb-ingest` — only if the `kb-ingest` plugin is enabled |

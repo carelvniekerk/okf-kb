@@ -52,9 +52,7 @@ ROOT_TITLE = "🧠 Knowledge Base"
 
 #: Standing prose under the root index badges. One sentence per line, per the
 #: repository's diff-friendly markdown convention.
-ROOT_INTRO = (
-    "A personal research wiki on large language models, "
-    "efficient inference, and alignment.\n"
+ROOT_INTRO_SUFFIX = (
     "Maintained by an LLM agent — see [Operations Log](./log.md) for history."
 )
 
@@ -749,6 +747,7 @@ def render_root_index(
 
     """
     title, groups_config, titles = _taxonomy(cfg)
+    description = config.DEFAULT_DESCRIPTION if cfg is None else cfg.description
     articles = root.all_articles()
     body = [f"# {title}", ""]
     body.extend(
@@ -759,7 +758,7 @@ def render_root_index(
             health_passing=health_passing,
         ),
     )
-    body.extend(["", ROOT_INTRO, ""])
+    body.extend(["", f"{description}\n{ROOT_INTRO_SUFFIX}", ""])
 
     if root.articles:
         body.extend(["---", "", f"## {FALLBACK_GROUP_TITLE}", ""])

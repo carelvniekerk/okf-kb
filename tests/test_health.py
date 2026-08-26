@@ -356,3 +356,35 @@ def test_article_without_a_sources_section_is_left_to_the_other_check(tmp_path):
         "  - resource: raw/notes/alpha.md\n---\n\n# Alpha\n",
     )
     assert health.check_sources_listed(tmp_path) == []
+
+
+# -- an article may honestly declare that it has no sources ------------------
+#
+# check_sources_sections wants a ## Sources section on every article, and that
+# section is what brings an article to check_source_files_frontmatter. Testing
+# the resolved list rather than the key left an article with genuinely no
+# sources — original writing, or content adopted from a folder whose origin git
+# cannot recover — unable to satisfy both at once.
+
+
+def test_explicit_empty_sources_is_a_declaration_not_a_gap(tmp_path):
+    wiki = tmp_path / "wiki"
+    _write(
+        wiki,
+        "alpha.md",
+        "---\ntype: concept\nsources: []\n---\n\n# Alpha\n\n## Sources\n\n_None._\n",
+    )
+    assert health.check_source_files_frontmatter(wiki) == []
+    assert health.check_sources_sections(wiki) == []
+
+
+def test_an_absent_sources_key_is_still_reported(tmp_path):
+    wiki = tmp_path / "wiki"
+    _write(
+        wiki,
+        "alpha.md",
+        "---\ntype: concept\n---\n\n# Alpha\n\n## Sources\n\n- x\n",
+    )
+    issues = health.check_source_files_frontmatter(wiki)
+    assert len(issues) == 1
+    assert "alpha.md" in issues[0]

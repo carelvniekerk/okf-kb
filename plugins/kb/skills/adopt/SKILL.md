@@ -144,8 +144,22 @@ Two fields deserve care:
   field is honest; a fabricated one poisons the trust signal.
 - **`sources`** — where the body has a `## Sources` section, convert its links
   into the provenance array. Where it has none and the article's origin is not
-  recoverable, leave `sources` out and say so in the handover. Do not invent
-  provenance to satisfy a schema.
+  recoverable, leave the `sources` key out and say so in the handover. Do not
+  invent provenance to satisfy a schema.
+
+  Such an article still needs a `## Sources` section in its body, because
+  `kb-health` requires one of every article and an adopted bundle would
+  otherwise never reach green. Write the absence explicitly rather than faking a
+  citation:
+
+  ```markdown
+  ## Sources
+
+  _No source recorded — adopted from existing notes._
+  ```
+
+  That is honest, it passes the check, and it marks the article as thin for
+  whoever reads it next.
 
 **Never write `verified`.** Every adopted article is unverified until a human
 reads it back against its sources. That is the correct state for a body of
@@ -155,6 +169,12 @@ Prefer existing curation over generated text: if a file already has a title or
 summary the user wrote, use it verbatim rather than composing a new one.
 
 ## 6. Generate and verify
+
+**Create `<wiki>/log.md` first**, before generating anything. The root index
+always links to the operations log, so an index generated without it fails the
+broken-link check — and a bundle that is born failing its own health check
+teaches the user to ignore it. Seed it with the adoption entry from step 8; you
+will not need to touch it again.
 
 ```bash
 kb-index

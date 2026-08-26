@@ -205,7 +205,23 @@ def check_subdir_indexes(wiki_dir: Path) -> list[str]:
 
 
 def check_source_files_frontmatter(wiki_dir: Path) -> list[str]:
-    """Find articles with ## Sources but no declared sources in frontmatter."""
+    """Find articles with ## Sources but no declared provenance in frontmatter.
+
+    Presence of the key is the declaration, not the length of what it holds. An
+    explicit empty ``sources: []`` says "this article has no sources", which is
+    the honest state for original writing and for content adopted from an
+    existing folder whose origin git cannot recover. Treating that as missing
+    would leave such an article unable to pass: it needs a ``## Sources``
+    section for :func:`check_sources_sections`, and that section is what brings
+    it here.
+
+    Args:
+        wiki_dir: Path to the wiki directory.
+
+    Returns:
+        One issue string per article whose provenance key is absent entirely.
+
+    """
     issues = []
     for md_file in iter_articles(wiki_dir):
         text = md_file.read_text(encoding="utf-8")
@@ -214,11 +230,10 @@ def check_source_files_frontmatter(wiki_dir: Path) -> list[str]:
         data = _frontmatter_of(md_file)
         if not data:
             continue
-        if not frontmatter.source_resources(data):
+        if data.get("sources") is None and data.get("source_files") is None:
             rel = md_file.relative_to(wiki_dir)
             issues.append(
-                f"Missing `source_files` frontmatter in `{rel}` "
-                f"(has ## Sources section)",
+                f"Missing `sources` frontmatter in `{rel}` (has ## Sources section)",
             )
     return issues
 

@@ -178,7 +178,7 @@ def _looks_unusable(segments: list[TranscriptSegment]) -> bool:
 def transcribe_with_whisper_audio(audio_path: Path, model: str) -> Transcript:
     """Run MLX Whisper against a pre-staged audio file."""
     try:
-        import mlx_whisper  # noqa: PLC0415
+        import mlx_whisper  # noqa: PLC0415  # ty: ignore[unresolved-import]
     except ImportError as exc:
         raise RuntimeError(  # noqa: TRY003
             "mlx-whisper is not installed. Install with `uv add mlx-whisper`.",  # noqa: EM101

@@ -257,18 +257,20 @@ def source_title(resource: str, root: Path) -> str:
     return _NOTION_SUFFIX.sub("", stem).strip() or resource
 
 
-def source_zone(resource: str) -> str:
-    """Return the ``raw/`` subdirectory a source lives in.
+def source_zone(resource: str, raw_name: str = "raw") -> str:
+    """Return the raw-zone subdirectory a source lives in.
 
     Args:
         resource: Repo-relative source path.
+        raw_name: Directory name of the raw zone. Configurable, so a bundle
+            that calls its sources ``notes/`` still resolves zones.
 
     Returns:
-        The zone name, or an empty string for files directly under ``raw/``.
+        The zone name, or an empty string for files directly under the raw zone.
 
     """
     parts = resource.split("/")
-    if len(parts) >= 3 and parts[0] == "raw":  # noqa: PLR2004
+    if len(parts) >= 3 and parts[0] == raw_name:  # noqa: PLR2004
         return parts[1]
     return ""
 
