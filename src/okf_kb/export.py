@@ -1,4 +1,4 @@
-"""Export wiki content to other formats: Marp slides, consolidated markdown, HTML."""
+"""Export wiki content to other formats: Marp slides, or the wiki as one file."""
 
 from pathlib import Path
 from typing import Annotated

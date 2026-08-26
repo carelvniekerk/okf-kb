@@ -1,4 +1,4 @@
-"""kb-video — YouTube ingestion for the research-brain knowledge base."""
+"""kb-video — YouTube ingestion for an Open Knowledge Format knowledge base."""
 
 __all__ = ["main"]
 

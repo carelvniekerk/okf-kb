@@ -966,7 +966,7 @@ def main(
         typer.Option(
             "--stamp-compiled",
             help=(
-                "Move the compiled badge to today. Only /compile should pass "
+                "Move the compiled badge to today. Only /kb:compile should pass "
                 "this — every other caller must leave the badge alone."
             ),
         ),

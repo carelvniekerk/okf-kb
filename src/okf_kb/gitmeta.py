@@ -65,7 +65,7 @@ class Commit:
         """The skill inferred from the commit subject's ``<type>:`` prefix.
 
         Commit types map onto the skills that produce them (``compile:`` is
-        written by ``/compile``, and so on). Types with no corresponding skill,
+        written by ``/kb:compile``, and so on). Types with no corresponding skill,
         such as ``chore:`` or ``refactor:``, yield ``None``.
         """
         head, sep, _ = self.subject.partition(":")
