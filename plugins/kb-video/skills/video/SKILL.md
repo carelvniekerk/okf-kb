@@ -202,8 +202,8 @@ Tell the user:
 ## Failure modes
 
 - **Age-gated/region-locked/private video** → `kb-video fetch` raises `IngestionError`. Surface and stop.
-- **`mlx-whisper not installed`** → tell the user `uv add mlx-whisper` (Mac only).
-- **`ffmpeg not found`** → tell the user `brew install ffmpeg`.
+- **`needs the okf-kb [video] extra`** → the `[video]` extra (`yt-dlp`, `mlx-whisper`, `python-slugify`) is not installed. The error already carries the exact install command, chosen to preserve any other extras the user has — **relay it verbatim** rather than composing one. Do not suggest `uv add mlx-whisper` or `pip install yt-dlp`: those install into the current project, not into the environment `kb-video` runs from. Run `kb-doctor` for the full picture if you need it.
+- **`ffmpeg not found`** → tell the user `brew install ffmpeg`. No extra can supply it; `kb-video fetch` and `frames` both check for it up front.
 - **Very long video (>1h)** with Whisper → warn the user transcription may take 10+ minutes.
 
 ## What NOT to do

@@ -32,31 +32,58 @@ would not want ignored — notes, papers, an existing wiki — stop and recommen
 
 ## 1. Check the tooling
 
-The skills are useless without the package. Verify before scaffolding anything:
+The skills are useless without the package, and each optional plugin is useless
+without its extra. Both are settled here, before anything is scaffolded.
+
+**First, list which of the four plugins are enabled in this session** —
+`kb`, `kb-ingest`, `kb-video`, `kb-capture`. This drives the install, so
+establish it before running anything. Each maps to an extra:
+
+| Plugin enabled | Extra it needs |
+|---|---|
+| `kb` | none — core |
+| `kb-capture` | none — core |
+| `kb-ingest` | `ingest` |
+| `kb-video` | `video`, plus `ffmpeg` on the system |
+
+Then check what is installed:
 
 ```bash
-command -v kb-health && kb-health --help >/dev/null 2>&1 && echo "core ok"
+kb-doctor
 ```
 
-If `kb-health` is not on the PATH, tell the user exactly how to install it and
-**stop** — do not scaffold a bundle whose tools cannot run:
+`kb-doctor` reports the core commands and every extra, and prints the exact
+install command for whatever is missing. It exits non-zero only on a broken
+core install, so pass `--require` for each optional plugin that is enabled to
+make its extra count too:
 
 ```bash
-uv tool install "okf-kb[ingest] @ git+ssh://git@github.com/carelvniekerk/okf-kb"
+kb-doctor --require kb-ingest --require kb-video
 ```
 
-Then check the optional extras against the plugins the user has enabled, since a
-plugin whose extra is missing fails at the moment it is used, not at install:
+**If `kb-doctor` is not on the PATH at all**, nothing is installed. Give the
+user the command matching the plugins they have enabled — never a fixed one:
 
-- **`kb-ingest` plugin** needs the `[ingest]` extra. Probe it:
-  `kb-ingest extract-pdf --help` — a `ModuleNotFoundError` for `fitz` or
-  `requests` means the extra is absent.
-- **`kb-video` plugin** needs the `[video]` extra *and* `ffmpeg`:
-  `command -v ffmpeg` and `kb-video --help`. Reinstall with `[all]` for video,
-  and `brew install ffmpeg` on macOS.
+| Plugins enabled | Install |
+|---|---|
+| `kb` and/or `kb-capture` only | `uv tool install "okf-kb @ git+ssh://git@github.com/carelvniekerk/okf-kb"` |
+| …plus `kb-ingest` | `uv tool install "okf-kb[ingest] @ git+ssh://git@github.com/carelvniekerk/okf-kb"` |
+| …plus `kb-video` | `uv tool install "okf-kb[video] @ git+ssh://git@github.com/carelvniekerk/okf-kb"` |
+| …both | `uv tool install "okf-kb[all] @ git+ssh://git@github.com/carelvniekerk/okf-kb"` |
 
-Report what is present and what is missing. A missing extra is a warning, not a
-blocker — scaffold anyway and note which skills will not work until it is added.
+Installing a *narrower* set than the enabled plugins need is the failure this
+step exists to prevent: the missing extra does not surface at install time, it
+surfaces weeks later when the user first runs `/kb-video:video`.
+
+**If the core is missing, stop** — do not scaffold a bundle whose tools cannot
+run. A missing *extra* is a warning, not a blocker: scaffold anyway, and say
+which skills stay broken until it is added. Take the fix straight from
+`kb-doctor`'s output rather than composing one; it already accounts for how the
+package was installed and for the extras the user has, which a reinstall with
+`--force` would otherwise remove.
+
+`kb-video` also needs `ffmpeg`, which no extra can install — `kb-doctor` lists
+it separately with `brew install ffmpeg`.
 
 ## 2. Interview
 
@@ -106,14 +133,32 @@ substitute the placeholders:
 | `{{CAPTURE_SKILLS}}` | Rows for `/kb-capture:capture`, `/kb-capture:meeting`, `/kb-capture:update-brief` — only if `kb-capture` is enabled |
 | `{{CAPTURE_TASKS}}` | The Capture and Meeting VS Code tasks — only if `kb-capture` is enabled |
 | `{{FOAM_TASK}}` | The graph-view task — only if the user uses the Foam extension |
+| `{{EXTRA_PLUGINS}}` | One `"<plugin>@okf-kb": true` entry per enabled optional plugin |
+| `{{INSTALL_COMMAND}}` | The install command whose extras match those plugins, from step 1 |
 
 A block for a plugin that is not enabled is replaced with nothing, not left as a
 placeholder and not left as a row pointing at a skill the user does not have.
 
-`{{CAPTURE_TASKS}}` and `{{FOAM_TASK}}` sit *inside* a JSON array, so each
-expands to a **leading comma then the objects**, and to the empty string when
-unused. Getting that wrong yields a trailing comma and a tasks file VS Code
-refuses to load — check the result parses before moving on.
+`{{CAPTURE_TASKS}}`, `{{FOAM_TASK}}` and `{{EXTRA_PLUGINS}}` sit *inside* JSON
+structures, so each expands to a **leading comma then the entries**, and to the
+empty string when unused. Getting that wrong yields a trailing comma and a file
+VS Code or Claude Code refuses to load — check the result parses before moving
+on.
+
+`{{EXTRA_PLUGINS}}`, for a user with `kb-ingest` and `kb-video` enabled:
+
+```json
+,
+        "kb-ingest@okf-kb": true,
+        "kb-video@okf-kb": true
+```
+
+Write an entry for every optional plugin enabled in this session, and nothing
+for the ones that are not. The scaffolded `settings.json` is what turns those
+plugins on for anyone who clones the bundle, so a plugin left out here is a
+skill that silently does not exist for them — and one put in without its extra
+installed is a skill that fails the first time they reach for it. Keep this
+list and the install command from step 1 describing the same set.
 
 `{{CAPTURE_TASKS}}`:
 

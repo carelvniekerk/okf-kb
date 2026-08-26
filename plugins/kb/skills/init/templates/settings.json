@@ -7,13 +7,14 @@
             "Bash(kb-health:*)",
             "Bash(kb-provenance:*)",
             "Bash(kb-export:*)",
+            "Bash(kb-doctor:*)",
             "Bash(kb-ingest:*)",
             "Bash(kb-video:*)",
             "Skill(kb:wiki-search)"
         ]
     },
     "enabledPlugins": {
-        "kb@okf-kb": true
+        "kb@okf-kb": true{{EXTRA_PLUGINS}}
     },
     "extraKnownMarketplaces": {
         "okf-kb": {

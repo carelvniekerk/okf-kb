@@ -310,8 +310,10 @@ capture is `/kb-capture:capture`, not `/kb:capture`:
 The `kb-*` tools ship in the [okf-kb](https://github.com/carelvniekerk/okf-kb) package, not in this repo.
 
 ```bash
-uv tool install "okf-kb[ingest] @ git+ssh://git@github.com/carelvniekerk/okf-kb"
+{{INSTALL_COMMAND}}
 ```
+
+The extras in that command match the plugins this bundle enables in `.claude/settings.json` — `[ingest]` for `kb-ingest`, `[video]` for `kb-video`. Installing fewer does not fail at install time; it fails the first time someone runs the skill whose extra is absent. Run `kb-doctor` to see what is present, and note that reinstalling with `uv tool install --force` **replaces** the environment, so any command you paste must name every extra you intend to keep.
 
 Invoke them directly — `kb-health`, not `uv run kb-health`.
 Each finds this bundle by walking up for `okf.toml`, so they run from anywhere inside the repo.
@@ -322,6 +324,7 @@ Each finds this bundle by walking up for `okf.toml`, so they run from anywhere i
 - **`kb-health`** — automated health checks; writes a timestamped report to `output/` and exits non-zero on issues.
 - **`kb-provenance`** — `map`, `affected`, `classify`, `migrate`.
 - **`kb-export`** — `marp` (slide deck), `consolidate` (flatten the wiki to one file).
+- **`kb-doctor`** — report which extras are installed and what to run to add the rest. `--require <plugin>` exits non-zero when that plugin's extra is missing.
 {{INGEST_TOOLS}}{{VIDEO_TOOLS}}
 
 ## Git Conventions

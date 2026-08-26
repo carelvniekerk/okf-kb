@@ -6,7 +6,7 @@ description: >
   Fetches content, localises images, commits, and offers to compile.
   YouTube videos are handled by /kb-video:video instead.
 when_to_use: When the user provides a source to ingest (arXiv ID, URL, PDF path, or raw/ file) and asks to add it to the knowledge base.
-allowed-tools: Read Write Bash(kb-ingest *) Bash(git *) WebFetch
+allowed-tools: Read Write Bash(kb-ingest *) Bash(kb-doctor *) Bash(git *) WebFetch
 disable-model-invocation: true
 argument-hint: <arXiv ID, URL, file path, or "raw/...">
 ---
@@ -55,3 +55,26 @@ Do not invoke `kb-ingest` for videos.
 5. Ask whether to compile now or defer.
 
 If the argument is unclear or missing, ask the user to specify the source.
+
+## When `kb-ingest` reports a missing extra
+
+Every command here needs the `[ingest]` extra (`pymupdf`, `requests`,
+`beautifulsoup4`, `markdownify`). It is imported lazily, so `kb-ingest` runs
+and only fails at the step that needs it, with:
+
+```
+kb-ingest needs the okf-kb [ingest] extra, which is not installed …
+```
+
+**Relay the install command in that message verbatim.** It is chosen for how the
+package was actually installed — a uv tool, a project venv, or a source
+checkout — and it names every extra the user already has, because
+`uv tool install --force` replaces the environment and a narrower command would
+silently remove their `[video]` support. Do not substitute `uv add pymupdf` or
+`pip install requests`: those land in the current project, not in the
+environment `kb-ingest` runs from.
+
+`kb-doctor` prints the same picture for every extra at once if you want to
+confirm before or after.
+
+Stop after reporting it. Do not commit, and do not log a half-finished ingest.

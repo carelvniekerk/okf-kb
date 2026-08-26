@@ -35,21 +35,28 @@ agreement. You may not edit what it says.
 
 ## 1. Check the tooling
 
-Same check as `/kb:init` — the skills are useless without the package:
+Same check as `/kb:init`. List which plugins are enabled in this session, then
+require the extra each one needs — `ingest` for `kb-ingest`, `video` (plus
+`ffmpeg`) for `kb-video`, nothing for `kb` and `kb-capture`:
 
 ```bash
-command -v kb-health && kb-health --help >/dev/null 2>&1 && echo "core ok"
+kb-doctor --require kb-ingest --require kb-video
 ```
 
-If missing, stop and tell the user to install it:
+Pass only the `--require` flags for plugins that are actually enabled.
+
+If `kb-doctor` is not on the PATH, nothing is installed: stop, and give the
+user the install command whose extras match their enabled plugins — no extras
+for core alone, `[ingest]`, `[video]`, or `[all]` for both:
 
 ```bash
-uv tool install "okf-kb[ingest] @ git+ssh://git@github.com/carelvniekerk/okf-kb"
+uv tool install "okf-kb[all] @ git+ssh://git@github.com/carelvniekerk/okf-kb"
 ```
 
-Probe the extras against the enabled plugins (`[ingest]` for `kb-ingest`,
-`[video]` plus `ffmpeg` for `kb-video`) and report what is missing. A missing
-extra is a warning, not a blocker.
+Otherwise take the fix verbatim from `kb-doctor`'s output; it already accounts
+for how the package was installed and preserves the extras already present. A
+missing core install is a blocker. A missing extra is a warning — report which
+skills it disables and carry on.
 
 ## 2. Survey
 
