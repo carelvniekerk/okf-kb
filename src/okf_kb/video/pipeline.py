@@ -1,7 +1,7 @@
 """Per-command handlers for ``kb-video``.
 
 The Python tool stages raw materials in ``video_scratch/<video_id>/`` and
-extracts frames on demand; Claude (via the ``/video`` slash command) does the
+extracts frames on demand; Claude (via ``/kb-video:video``) does the
 quality judgement, picks important timestamps, writes the final article in
 ``raw/videos/``, moves keeper frames into ``raw/images/``, and runs cleanup.
 """
@@ -14,6 +14,7 @@ import subprocess
 from dataclasses import asdict
 from typing import TYPE_CHECKING
 
+from okf_kb import extras
 from okf_kb.video.transcribe import (
     transcribe_with_captions,
     transcribe_with_whisper_audio,
@@ -30,11 +31,38 @@ from okf_kb.video.youtube import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
 
 class IngestionError(RuntimeError):
     """Raised when a kb-video command cannot complete."""
+
+
+def _stage[T](what: str, run: Callable[[], T]) -> T:
+    """Run one stage of a command, naming it in whatever goes wrong.
+
+    A missing extra passes through untouched: its message already names the
+    extra and the command that installs it, and wrapping it in a stage-specific
+    prefix would bury the one line the user can act on.
+
+    Args:
+        what: How to describe this stage's failure, e.g. "audio download failed".
+        run: The stage to run.
+
+    Returns:
+        Whatever ``run`` returned.
+
+    Raises:
+        IngestionError: If the stage failed for any reason but a missing extra.
+
+    """
+    try:
+        return run()
+    except extras.MissingExtraError:
+        raise
+    except Exception as exc:
+        raise IngestionError(f"{what}: {exc}") from exc  # noqa: EM102, TRY003
 
 
 # ---------------------------------------------------------------------------
@@ -44,10 +72,11 @@ class IngestionError(RuntimeError):
 
 def cmd_fetch(url: str, scratch_dir: Path) -> None:
     """Stage metadata, captions, audio, and low-res video into ``scratch_dir/<id>/``."""
-    try:
-        metadata = fetch_metadata(url)
-    except Exception as exc:
-        raise IngestionError(f"could not fetch metadata: {exc}") from exc  # noqa: EM102, TRY003
+    # yt-dlp shells out to ffmpeg to remux the audio track; without it the
+    # download fails deep inside the postprocessor with an opaque message.
+    extras.require_binary("ffmpeg", "video")
+
+    metadata = _stage("could not fetch metadata", lambda: fetch_metadata(url))
 
     workdir = scratch_dir / metadata.video_id
     workdir.mkdir(parents=True, exist_ok=True)
@@ -91,17 +120,11 @@ def cmd_fetch(url: str, scratch_dir: Path) -> None:
         print("  ⚠ no usable captions — run `kb-video whisper` next")
 
     print("→ downloading audio for whisper fallback...")
-    try:
-        audio = download_audio(url, workdir)
-    except Exception as exc:
-        raise IngestionError(f"audio download failed: {exc}") from exc  # noqa: EM102, TRY003
+    audio = _stage("audio download failed", lambda: download_audio(url, workdir))
     print(f"  ✓ {_human_bytes(audio.stat().st_size)} audio.wav")
 
     print("→ downloading low-res video for frame extraction...")
-    try:
-        video = download_video(url, workdir)
-    except Exception as exc:
-        raise IngestionError(f"video download failed: {exc}") from exc  # noqa: EM102, TRY003
+    video = _stage("video download failed", lambda: download_video(url, workdir))
     print(f"  ✓ {_human_bytes(video.stat().st_size)} video.mp4")
 
     print()
@@ -128,10 +151,10 @@ def cmd_whisper(video_id: str, scratch_dir: Path, model: str) -> None:
         )
 
     print(f"→ transcribing {audio.name} with {model} (this can take a few minutes)...")
-    try:
-        transcript = transcribe_with_whisper_audio(audio, model)
-    except Exception as exc:
-        raise IngestionError(f"whisper transcription failed: {exc}") from exc  # noqa: EM102, TRY003
+    transcript = _stage(
+        "whisper transcription failed",
+        lambda: transcribe_with_whisper_audio(audio, model),
+    )
 
     method = f"whisper:{model.rsplit('/', 1)[-1]}"
     write_transcript(transcript, workdir / "transcript.md", method=method)
@@ -150,7 +173,7 @@ def cmd_frames(
 ) -> None:
     """Extract frames at given timestamps into ``scratch_dir/<id>/frames/``.
 
-    Frames stay in scratch — the ``/video`` slash command reviews them and only
+    Frames stay in scratch — ``/kb-video:video`` reviews them and only
     moves keepers into ``raw/images/<slug>-<id>/``. Anything left in scratch is
     discarded by ``cmd_cleanup``.
     """
@@ -160,10 +183,7 @@ def cmd_frames(
         raise IngestionError(  # noqa: TRY003
             f"no video at {video}; run `kb-video fetch <url>` first",  # noqa: EM102
         )
-    if shutil.which("ffmpeg") is None:
-        raise IngestionError(  # noqa: TRY003
-            "ffmpeg not found — install with `brew install ffmpeg`",  # noqa: EM101
-        )
+    extras.require_binary("ffmpeg", "video")
 
     output_dir = workdir / "frames"
     output_dir.mkdir(parents=True, exist_ok=True)

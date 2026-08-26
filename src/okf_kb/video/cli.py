@@ -1,7 +1,7 @@
 """Command-line entry point for ``kb-video``.
 
-The tool exposes four primitives that Claude orchestrates via the ``/video``
-slash command:
+The tool exposes four primitives that Claude orchestrates via the
+``/kb-video:video`` skill:
 
     kb-video fetch <url>                    # stage metadata, captions, audio, video
     kb-video whisper <video_id>             # re-transcribe audio with MLX Whisper
@@ -15,6 +15,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from okf_kb.extras import MissingBinaryError, MissingExtraError
 from okf_kb.video.pipeline import (
     IngestionError,
     cmd_cleanup,
@@ -28,7 +29,9 @@ def main(argv: list[str] | None = None) -> int:
     """Dispatch to the right subcommand based on argv."""
     parser = argparse.ArgumentParser(
         prog="kb-video",
-        description="Stage and process YouTube videos for /video → raw/videos/.",
+        description=(
+            "Stage and process YouTube videos for /kb-video:video → raw/videos/."
+        ),
     )
     parser.add_argument(
         "--scratch-dir",
@@ -84,6 +87,11 @@ def main(argv: list[str] | None = None) -> int:
             cmd_frames(args.video_id, args.scratch_dir, args.timestamps)
         elif args.command == "cleanup":
             cmd_cleanup(args.video_id, args.scratch_dir)
+    except (MissingExtraError, MissingBinaryError) as exc:
+        # Already a full, actionable message — printing it bare keeps the
+        # install command on its own line where it can be copied.
+        print(exc, file=sys.stderr)
+        return 1
     except IngestionError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

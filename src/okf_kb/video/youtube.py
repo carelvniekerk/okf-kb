@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from okf_kb import extras
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -64,7 +66,8 @@ _YDL_BASE_OPTS = {
 
 def fetch_metadata(url: str) -> VideoMetadata:
     """Resolve a YouTube URL or ID into a structured metadata record."""
-    from yt_dlp import YoutubeDL  # noqa: PLC0415  # ty: ignore[unresolved-import]
+    with extras.required("video"):
+        from yt_dlp import YoutubeDL  # noqa: PLC0415  # ty: ignore[unresolved-import]
 
     with YoutubeDL(_YDL_BASE_OPTS) as ydl:
         info = ydl.extract_info(url, download=False)
@@ -117,7 +120,8 @@ def download_audio(url: str, workdir: Path) -> Path:
         # Force 16k mono via ffmpeg postprocessor args — Whisper's expected input.
         "postprocessor_args": ["-ar", "16000", "-ac", "1"],
     }
-    from yt_dlp import YoutubeDL  # noqa: PLC0415  # ty: ignore[unresolved-import]
+    with extras.required("video"):
+        from yt_dlp import YoutubeDL  # noqa: PLC0415  # ty: ignore[unresolved-import]
 
     with YoutubeDL(opts) as ydl:
         ydl.download([url])
@@ -148,7 +152,8 @@ def download_video(url: str, workdir: Path, max_height: int = 720) -> Path:
         "overwrites": True,
         "merge_output_format": "mp4",
     }
-    from yt_dlp import YoutubeDL  # noqa: PLC0415  # ty: ignore[unresolved-import]
+    with extras.required("video"):
+        from yt_dlp import YoutubeDL  # noqa: PLC0415  # ty: ignore[unresolved-import]
 
     with YoutubeDL(opts) as ydl:
         ydl.download([url])
@@ -180,7 +185,8 @@ def download_subtitles(url: str, workdir: Path) -> Path | None:
         "outtmpl": output_template,
         "overwrites": True,
     }
-    from yt_dlp import YoutubeDL  # noqa: PLC0415  # ty: ignore[unresolved-import]
+    with extras.required("video"):
+        from yt_dlp import YoutubeDL  # noqa: PLC0415  # ty: ignore[unresolved-import]
 
     try:
         with YoutubeDL(opts) as ydl:
@@ -202,7 +208,8 @@ def download_subtitles(url: str, workdir: Path) -> Path | None:
 
 def slugify_title(title: str) -> str:
     """Filesystem-safe slug for filenames, capped at a sensible length."""
-    from slugify import slugify  # noqa: PLC0415  # ty: ignore[unresolved-import]
+    with extras.required("video"):
+        from slugify import slugify  # noqa: PLC0415  # ty: ignore[unresolved-import]
 
     slug = slugify(title, max_length=60, word_boundary=True, save_order=True)
     # python-slugify returns empty string for purely non-ASCII titles; fall back.

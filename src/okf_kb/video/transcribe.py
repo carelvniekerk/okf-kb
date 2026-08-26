@@ -10,6 +10,7 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generator
 
+from okf_kb import extras
 from okf_kb.video.youtube import (
     download_subtitles,
     seconds_to_hms,
@@ -177,12 +178,8 @@ def _looks_unusable(segments: list[TranscriptSegment]) -> bool:
 
 def transcribe_with_whisper_audio(audio_path: Path, model: str) -> Transcript:
     """Run MLX Whisper against a pre-staged audio file."""
-    try:
+    with extras.required("video"):
         import mlx_whisper  # noqa: PLC0415  # ty: ignore[unresolved-import]
-    except ImportError as exc:
-        raise RuntimeError(  # noqa: TRY003
-            "mlx-whisper is not installed. Install with `uv add mlx-whisper`.",  # noqa: EM101
-        ) from exc
 
     if not audio_path.exists():
         raise FileNotFoundError(audio_path)

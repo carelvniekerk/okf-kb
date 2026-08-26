@@ -11,9 +11,22 @@ from typing import Annotated
 
 import typer
 
-from okf_kb import config
+from okf_kb import config, extras
 
 app = typer.Typer(help="Ingestion tools for the knowledge base.")
+
+
+def main() -> None:
+    """Run the CLI, reporting a missing extra instead of raising a traceback.
+
+    Typer lets unknown exceptions escape as tracebacks, which buries the
+    install command under a stack the user has no use for.
+    """
+    try:
+        app()
+    except extras.MissingExtraError as exc:
+        typer.echo(str(exc), err=True)
+        raise SystemExit(1) from exc
 
 
 @app.command()
@@ -38,7 +51,8 @@ def download_images(
     Images are saved to raw/images/<markdown-stem>/ by default (one subdirectory per
     source document). Rewrites image references to paths relative to the markdown file.
     """
-    import requests  # noqa: PLC0415
+    with extras.required("ingest"):
+        import requests  # noqa: PLC0415
 
     resolved = markdown_file.resolve()
     if image_dir is None:
@@ -103,7 +117,8 @@ def extract_pdf(
     ] = None,
 ) -> None:
     """Extract text from a PDF and save as markdown."""
-    import fitz  # pymupdf  # noqa: PLC0415
+    with extras.required("ingest"):
+        import fitz  # pymupdf  # noqa: PLC0415
 
     if output is None:
         output = pdf_file.with_suffix(".md")
@@ -130,7 +145,8 @@ def html_to_md(
     output: Annotated[Path | None, typer.Option(help="Output markdown file.")] = None,
 ) -> None:
     """Convert an HTML file to clean markdown."""
-    from markdownify import markdownify  # noqa: PLC0415
+    with extras.required("ingest"):
+        from markdownify import markdownify  # noqa: PLC0415
 
     if output is None:
         output = html_file.with_suffix(".md")
@@ -170,7 +186,8 @@ def arxiv(  # noqa: C901, PLR0912, PLR0915
         kb-ingest arxiv https://arxiv.org/abs/2402.12345
 
     """
-    import requests  # noqa: PLC0415
+    with extras.required("ingest"):
+        import requests  # noqa: PLC0415
 
     raw = config.resolve_dir(None, "raw")
     papers_dir = papers_dir or raw / "papers"
@@ -201,8 +218,9 @@ def arxiv(  # noqa: C901, PLR0912, PLR0915
     try:
         resp = requests.get(ar5iv_url, timeout=60)
         if resp.status_code == 200 and len(resp.text) > 1000:  # noqa: PLR2004
-            from bs4 import BeautifulSoup  # noqa: PLC0415
-            from markdownify import markdownify  # noqa: PLC0415
+            with extras.required("ingest"):
+                from bs4 import BeautifulSoup  # noqa: PLC0415
+                from markdownify import markdownify  # noqa: PLC0415
 
             soup = BeautifulSoup(resp.text, "html.parser")
 
@@ -287,7 +305,8 @@ def arxiv(  # noqa: C901, PLR0912, PLR0915
 
     # Extract text from PDF
     try:
-        import fitz  # noqa: PLC0415
+        with extras.required("ingest"):
+            import fitz  # noqa: PLC0415
 
         doc = fitz.open(pdf_output)
         lines = [f"# arXiv: {arxiv_id}\n\n"]
@@ -301,9 +320,11 @@ def arxiv(  # noqa: C901, PLR0912, PLR0915
 
         md_output.write_text("\n".join(lines), encoding="utf-8")
         typer.echo(f"Extracted PDF to markdown: {md_output}")
-    except ImportError:
-        typer.echo("[WARN] pymupdf not installed. PDF saved but not extracted.")
-        typer.echo("  Run: uv pip install pymupdf")
+    except extras.MissingExtraError as e:
+        # Only reachable on a half-installed extra: requests comes from the
+        # same one and is imported above. The PDF is on disk either way, so
+        # report the gap rather than failing the whole ingest.
+        typer.echo(f"[WARN] PDF saved but not extracted — {e}")
 
 
 @app.command()
