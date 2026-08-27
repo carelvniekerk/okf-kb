@@ -239,6 +239,16 @@ After integrating each source:
 - Update `## Related Articles` if cross-references were discovered during integration.
 - Add backlinks in both directions between any articles that reference each other.
 
+### 5f. Keep okf.toml in sync
+
+If a new article landed in a wiki subdirectory that has no entry in `okf.toml`'s
+`[directories]` table, add one with a display title, and place that directory
+in whichever `[[groups]]` entry it best fits — or a new group, if none does.
+A directory absent from every group still renders, under the "📁 Unfiled"
+fallback heading, so this is never required for correctness — but a source
+left there silently is a section that never got named. Do the same for any
+directory renamed or introduced by restructuring during this compile.
+
 ## 6. Regenerate the indexes
 
 Do **not** hand-edit any `INDEX.md`. They are generated from article frontmatter:
