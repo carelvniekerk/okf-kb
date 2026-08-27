@@ -174,14 +174,14 @@ list and the install command from step 1 describing the same set.
         {
             "label": "🎙️ Capture",
             "type": "shell",
-            "command": "claude /kb-capture:capture",
+            "command": "claude-private /kb-capture:capture",
             "group": { "kind": "build", "isDefault": false },
             "presentation": { "reveal": "always", "focus": false, "panel": "shared" }
         },
         {
             "label": "👥 Meeting",
             "type": "shell",
-            "command": "claude /kb-capture:meeting",
+            "command": "claude-private /kb-capture:meeting",
             "group": { "kind": "build", "isDefault": false },
             "presentation": { "reveal": "always", "focus": false, "panel": "shared" }
         }
