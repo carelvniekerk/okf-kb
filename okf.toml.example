@@ -58,7 +58,7 @@ directories = ["tools"]
 # provider = "google"                 # google | microsoft
 # id = "you@example.com"              # google only; omit for microsoft
 # # event_type_filter = ["birthday"]  # optional, google only
-# # drop_subject_prefix = "Daily /"   # optional: recurring noise to exclude
+# # drop_subject_prefix = ["Daily /"] # optional: recurring noise to exclude
 
 # One entry per mailbox, for the daily brief's inbox section.
 # [[capture.mailboxes]]

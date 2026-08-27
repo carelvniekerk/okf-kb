@@ -44,7 +44,7 @@ kb_format = "1.0"
 # provider = "google"                 # google | microsoft
 # id = "you@example.com"              # google only; omit for microsoft
 # # event_type_filter = ["birthday"]  # optional, google only
-# # drop_subject_prefix = "Daily /"   # optional: recurring noise to exclude
+# # drop_subject_prefix = ["Daily /"] # optional: recurring noise to exclude
 #
 # [[capture.mailboxes]]
 # name = "Gmail"                      # tag shown against each inbox line

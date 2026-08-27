@@ -414,7 +414,7 @@ name = "Primary"                    # label used in failure notes
 provider = "google"                 # google | microsoft
 id = "you@example.com"              # google only; omit for microsoft
 # event_type_filter = ["birthday"]  # optional, google only
-# drop_subject_prefix = "Daily /"   # optional: recurring noise to exclude
+# drop_subject_prefix = ["Daily /"] # optional: recurring noise to exclude
 
 [[capture.mailboxes]]
 name = "Gmail"                      # tag shown against each inbox line
@@ -433,8 +433,9 @@ by start time and dedupe.
   and `order: "oldest"`. Pass no `calendarId` — it defaults to the signed-in
   user's default calendar.
 - Where an entry sets `drop_subject_prefix`, discard every event whose subject
-  starts with it. Recurring standups are noise and must never appear in the
-  brief, not even as "first meeting of the day" filler.
+  starts with any of its values. It takes a **list of strings**; a bare string
+  is accepted as a one-element list. Recurring standups are noise and must never
+  appear in the brief, not even as "first meeting of the day" filler.
 
 **Mailboxes.** Fan out across every configured mailbox for the last 2 days.
 
