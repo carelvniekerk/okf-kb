@@ -49,6 +49,8 @@ Wait for the answer.
 
 Use the **calendar set** configured in `okf.toml`'s `[[capture.calendars]]` — the same set `/kb-capture:capture` reads. Fan out one call per entry (`list_events` for `provider = "google"`, `outlook_calendar_search` for `provider = "microsoft"`), merge by start time, dedupe.
 Use the same rendering rules (prefix non-primary timed events with `[<calendar name>]`, render birthdays as `🎂 **<Name>'s birthday**`, holidays as `🎉 **<Holiday>**`).
+Apply the same **drop rules**: where an entry sets `drop_subject_prefix`, discard every event whose subject starts with any of its values.
+A refresh that reintroduces the recurring standups `/kb-capture:capture` filtered out is a regression, not an update.
 
 In parallel:
 1. **Calendar — today:** fan-out fetch for today's window.
