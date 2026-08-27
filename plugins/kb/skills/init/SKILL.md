@@ -114,6 +114,13 @@ brief wired to their calendars and mail. If yes, collect one entry per calendar
 (label, `gmail` or `outlook`). If they would rather do it later, leave the
 `[capture]` block commented — the skill degrades to input-only and says so once.
 
+The calendars serve double duty: `/kb-capture:capture meeting granola` matches a
+Granola transcript against the same entries to recover the invitee list and
+start time. Say so when asking, so the answer is not weighed against the brief
+alone. Do **not** ask for a Granola folder id here — `[capture.granola]` is
+optional, it needs an id only `list_meeting_folders` can supply, and an omitted
+table just means every accessible meeting is in scope.
+
 Never invent a calendar id, an email address, or an employer. If the user does
 not supply one, leave it out.
 

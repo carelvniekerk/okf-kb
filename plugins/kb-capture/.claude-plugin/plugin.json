@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "kb-capture",
   "version": "0.1.0",
-  "description": "Daily capture for an Open Knowledge Format knowledge base: start-of-day briefs that pull your calendars and inbox, live meeting notes, and voice notes — all filed into raw/ as normal sources. Calendars, mail accounts and brief sections are configured per bundle in okf.toml's [capture] table, so nothing about your accounts is baked into the skill.",
+  "description": "Daily capture for an Open Knowledge Format knowledge base: start-of-day briefs that pull your calendars and inbox, live meeting notes, Granola meeting transcripts matched against the calendar event, and voice notes — all filed into raw/ as normal sources. Ships the Granola MCP server; calendars, mail accounts and brief sections are configured per bundle in okf.toml's [capture] table, so nothing about your accounts is baked into the skill.",
   "author": {
     "name": "Carel van Niekerk",
     "email": "code@carelvanniekerk.com",
@@ -11,5 +11,13 @@
   "homepage": "https://github.com/carelvniekerk/okf-kb",
   "repository": "https://github.com/carelvniekerk/okf-kb",
   "license": "MIT",
-  "keywords": ["knowledge-base", "okf", "daily-brief", "meeting-notes", "calendar"]
+  "keywords": [
+    "knowledge-base",
+    "okf",
+    "daily-brief",
+    "meeting-notes",
+    "calendar",
+    "granola",
+    "transcript"
+  ]
 }

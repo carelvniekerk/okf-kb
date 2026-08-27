@@ -2,12 +2,12 @@
 name: capture
 description: >
   Capture a voice note, daily brief, or meeting note — handles spoken content (via Claude Code's
-  voice mode), pasted transcripts, and existing markdown notes files.
-  Turns any of these into structured markdown and commits.
-when_to_use: When the user says "capture", "voice note", "daily brief", "start my day", "morning brief", or "meeting note". Also when the user provides a voice transcript and wants it structured.
-allowed-tools: Read Write Edit Bash(kb-search *) Bash(git *) mcp__claude_ai_Google_Calendar__list_events mcp__claude_ai_Gmail__search_threads mcp__claude_ai_Microsoft_365__outlook_calendar_search mcp__claude_ai_Microsoft_365__outlook_email_search
+  voice mode), pasted transcripts, existing markdown notes files, and Granola meeting transcripts
+  matched against your calendar. Turns any of these into structured markdown and commits.
+when_to_use: When the user says "capture", "voice note", "daily brief", "start my day", "morning brief", or "meeting note". Also when the user provides a voice transcript and wants it structured, or asks to pull a meeting in from Granola.
+allowed-tools: Read Write Edit Bash(kb-search *) Bash(git *) mcp__claude_ai_Google_Calendar__list_events mcp__claude_ai_Gmail__search_threads mcp__claude_ai_Microsoft_365__outlook_calendar_search mcp__claude_ai_Microsoft_365__outlook_email_search mcp__granola__list_meetings mcp__granola__get_meetings mcp__granola__get_meeting_transcript mcp__granola__list_meeting_folders mcp__granola__get_account_info mcp__claude_ai_Granola__list_meetings mcp__claude_ai_Granola__get_meetings mcp__claude_ai_Granola__get_meeting_transcript mcp__claude_ai_Granola__list_meeting_folders mcp__claude_ai_Granola__get_account_info
 disable-model-invocation: true
-argument-hint: "note | brief | meeting [path/to/notes.md]"
+argument-hint: "note | brief | meeting [path/to/notes.md | granola]"
 ---
 
 # Capture
@@ -16,8 +16,9 @@ Capture a voice note, daily brief, or meeting note. $ARGUMENTS is optional:
 - `note` — free-form note
 - `brief` — start-of-day daily brief (use `/kb-capture:update-brief` for mid-day updates)
 - `meeting [path]` — meeting note, with optional path to an existing markdown file of raw notes taken during the meeting
+- `meeting granola` — meeting note built from a Granola transcript, with metadata filled from the matching calendar event
 
-This command handles spoken content (via Claude Code's voice mode), pasted transcripts (e.g. from the Claude mobile app), and — for meetings — a path to an existing markdown notes file.
+This command handles spoken content (via Claude Code's voice mode), pasted transcripts (e.g. from the Claude mobile app), and — for meetings — a path to an existing markdown notes file or a transcript pulled from Granola.
 It turns any of these into structured markdown.
 
 ## Ground rules (apply to all types)
@@ -26,7 +27,7 @@ It turns any of these into structured markdown.
 Only restructure, reorder, and clean the user's words.
 Do not invent facts, examples, claims, attendees, decisions, or supporting detail that is not in the input.
 - If a section has no source material, **leave it empty or omit it** — do not pad.
-- External data (calendar, Gmail) is allowed but must be **clearly attributed** as agent-fetched, never mixed into the user's own words.
+- External data (calendar, Gmail, Granola) is allowed but must be **clearly attributed** as agent-fetched, never mixed into the user's own words.
 - One sentence per line in body content (matches the repo's git-diff convention).
 - Standard markdown links only, never Obsidian `[[wikilinks]]`.
 - Use emojis in headers per CLAUDE.md conventions.
@@ -38,6 +39,7 @@ If `$ARGUMENTS` begins with `note`, `brief`, or `meeting`, use that.
 Otherwise ask: **"Note, daily brief, or meeting?"** and wait.
 
 For `meeting`, if a path follows (`meeting /path/to/notes.md`), capture it as the provisional notes path for Section 3c below.
+If the word `granola` follows instead (`meeting granola`), skip straight to the Granola import in Section 3c Step 1.
 
 ## 2. Gather the input (for `note` and `brief`)
 
@@ -130,21 +132,71 @@ tags: [tag1, tag2, tag3]
 
 ### Step 1: Gather inputs
 
-A meeting can be built from any combination of: an existing markdown notes file, a voice recap, or a pasted transcript.
+A meeting can be built from any combination of: a Granola transcript, an existing markdown notes file, a voice recap, or a pasted transcript.
 At least one input is required.
 
-1. **Notes file path:**
+1. **Granola transcript:**
+   - If `$ARGUMENTS` was `meeting granola`, go straight to Step 1a.
+   - Otherwise ask: *"Pull the transcript from Granola? (y / n)"*
+   If `y`, run Step 1a.
+2. **Notes file path:**
    - If `$ARGUMENTS` passed a path (`meeting /path/to/notes.md`), use it.
    Verify the file exists and is readable.
    - Otherwise ask: *"Path to a markdown notes file from the meeting? (`skip` for none.)"*
    Wait for the reply. Validate.
-2. **Voice / paste recap:** ask: *"Want to add a voice or pasted recap in addition? (y / n)"*
+3. **Voice / paste recap:** ask: *"Want to add a voice or pasted recap in addition? (y / n)"*
    - If `y`: use the Section 2 voice/paste prompt.
    Wait for the transcript.
-3. If neither a file nor a recap was provided, stop and tell the user the meeting needs at least one input.
+4. If none of the three prompts yielded an input, stop and tell the user the meeting needs at least one.
 
 Read the notes file fully if provided.
 Treat it as unstructured input — it will not follow wiki conventions.
+
+### Step 1a: Import from Granola
+
+The `kb-capture` plugin ships the Granola MCP server in its own `.mcp.json`, so
+the tools arrive as `mcp__granola__*` once the user authenticates. Someone who
+already had Granola as a claude.ai connector gets the same six tools under
+`mcp__claude_ai_Granola__*` instead. **Use whichever prefix is connected** —
+they take identical arguments.
+
+If neither responds, say so in one line — *"Granola is not connected; run `/mcp`
+and authenticate `granola`."* — and carry on with the remaining inputs. A
+missing connector is a skip, not an error, and never a reason to abandon the
+capture.
+
+**Pick the meeting.**
+
+1. Ask *"Which day?"* unless the user already said.
+Default to today.
+2. Call `list_meetings`.
+Use `time_range: "this_week"` for today or a day in the current week, otherwise
+`time_range: "custom"` with `custom_start` / `custom_end` bracketing the day.
+If `[capture.granola]` in `okf.toml` sets a `folder_id`, pass it to scope the
+listing; otherwise omit it and let every accessible meeting through.
+3. Show the results numbered, one line each — `HH:MM — <title> — <n> attendees`
+— and wait for the pick.
+Confirm even when only one came back; the point is that the user recognises it.
+4. If the listing is empty, say so and report what `get_account_info` gives for
+`mcp_note_access.scopes`, since an empty result is usually a scope or plan
+boundary rather than a missing meeting.
+
+**Fetch the content.** With the chosen meeting id:
+
+- `get_meetings` with a single-element `meeting_ids` — returns the AI summary,
+  the user's private notes, and Granola's attendee metadata.
+  The tool caps at 10 ids; this flow only ever passes one.
+- `get_meeting_transcript` — the verbatim record.
+  This one is **paid-plan only**.
+  If it errors or comes back empty, note it in one line and build the note from
+  the summary and notes alone.
+  Do not retry and do not suggest a plan upgrade.
+
+**Never treat Granola metadata as an attendance record.** Its own schema warns
+that participant metadata "can be incomplete and does not prove attendance", and
+that `captured_by_me` identifies the note owner rather than the organiser. The
+calendar event, fetched in Step 2a, is the authority on who was invited. Granola
+is the authority on what was said.
 
 ### Step 2: Gather metadata
 
@@ -154,11 +206,62 @@ Extract what you can from the inputs, then ask for anything missing:
 - **Attendees** — extract names mentioned in the notes or recap, then confirm with the user: *"I found attendees: [list]. Anything to add or correct?"*
 Do not invent names.
 
+### Step 2a: Match the calendar event
+
+Run this whenever a meeting date and time are known — after a Granola import it
+is nearly free, and it is what turns a bare transcript into a filed meeting.
+
+Read the `[capture].calendars` entries in `okf.toml` — the **same table the
+daily brief uses**, so a user who wired up their calendars once has already
+configured this. If the table declares no calendars, skip this step silently and
+keep the metadata gathered in Step 2.
+
+Fan out across every configured calendar for the meeting's day:
+
+- `provider = "google"` → `mcp__claude_ai_Google_Calendar__list_events` with the
+  entry's `id` as `calendarId`.
+- `provider = "microsoft"` → `mcp__claude_ai_Microsoft_365__outlook_calendar_search`
+  with `query: "*"` and `afterDateTime` / `beforeDateTime` bracketing the day.
+
+**Match** an event to the meeting on start time within ±15 minutes *and* a
+recognisable title overlap. Then:
+
+- **Exactly one match:** adopt it.
+- **Several:** show them numbered and ask which.
+- **None:** say so in one line and keep Step 2's metadata. Do not stretch the
+  window to force a match.
+
+From the matched event take the **scheduled start time**, the **full invitee
+list** (names and, where given, roles or organisations), the **organiser**, and
+the **location**. Merge those with any names found in the inputs, then confirm
+the combined list with the user before writing — a calendar invite lists who was
+asked, not who turned up.
+
+A calendar fetch that fails must not block the capture: note the miss and
+continue.
+
+### Step 2b: Resolve speaker labels
+
+Granola labels speakers `Me` for the note-taker, `Them` for unidentified others,
+and by name where it knows them.
+
+- Rewrite `Me` to the bundle's human id display name.
+- Rewrite `Them` to a real name **only** when the matched calendar event has
+  exactly two attendees, so exactly one candidate exists.
+- With three or more attendees, **leave `Them` as `Them`.** Guessing who spoke is
+  fabrication, and the ground rules forbid it.
+- Leave named speakers exactly as Granola gave them.
+
 ### Step 3: Derive slug and filename
 
 - Slug: short kebab-case from the meeting title (≤ 5 words).
 - Filename: `raw/meetings/YYYY-MM-DD-<slug>.md` (using the meeting date, not today's date if different).
 - Collision: append `-2`, `-3`, etc.
+
+**If this came from Granola, check for a re-import first.** Search
+`raw/meetings/` for an existing file whose frontmatter carries the same
+`granola_id`. If one exists, stop and tell the user which file it is rather than
+filing a second copy of the same meeting.
 
 ### Step 4: Discover related wiki articles
 
@@ -175,7 +278,10 @@ Apply these modifications for the post-hoc capture case:
 - `tags`: extend to `[meeting, <topic-tags>]` — add 1–3 topic tags derived from the content.
 - `date_added` / `date_updated`: today.
 - `meeting_date`: use just `YYYY-MM-DD` (no `HH:MM`) — post-hoc capture doesn't need the start time.
-- `attendees`: populate from the names confirmed in Step 2.
+  Where Step 2a matched a calendar event, use its scheduled `YYYY-MM-DD HH:MM` instead.
+- `attendees`: populate from the names confirmed in Step 2 / Step 2a.
+- `granola_id: <uuid>`: add **only** when the meeting came from Granola.
+  This is what makes the re-import check in Step 3 work.
 
 **Body — replace each empty section with content drawn from the inputs:**
 - After the title, add a one-paragraph context: what the meeting was about and why it happened.
@@ -211,12 +317,29 @@ Preserve substantive content: arguments made, data cited, examples given.
 
 <Verbatim transcript, lightly cleaned.>
 
+<If a Granola transcript was imported:>
+
+### Granola transcript
+
+<Verbatim transcript, speaker labels resolved per Step 2b. Do not summarise,
+trim, or reorder it — this is the source record, and raw/ exists to hold source
+records at full length.>
+
 <!-- /source -->
 ```
+
+Where Granola supplied its own AI summary or the user's private notes, those are
+**not** raw input — they are already-processed content. Fold them into
+`## 💬 Discussion` and `## 🎯 Key Takeaways` like any other input, and attribute
+them in `## Sources`. Only the verbatim transcript belongs under `## Raw Input`.
 
 **`## Sources` section:**
 - `- <Original notes file path, if provided>`
 - `- Recap captured <voice | pasted | typed> on YYYY-MM-DD, if provided.`
+- `- Granola meeting \`<granola_id>\` — transcript and notes, imported YYYY-MM-DD.`
+  Say `transcript unavailable on this plan` instead of `transcript and notes` if
+  `get_meeting_transcript` returned nothing.
+- `- Calendar event from <calendar name>, YYYY-MM-DD HH:MM.` — only when Step 2a matched one.
 
 ### Step 6: Save, commit, offer to compile
 

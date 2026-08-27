@@ -18,6 +18,7 @@ $ARGUMENTS is optional: pass the meeting title to skip the prompt.
 
 This is for **live note-taking** — it drops an empty structured file at `raw/meetings/YYYY-MM-DD-<slug>.md` with frontmatter pre-filled using today's date and current time, and empty section headers ready to type into.
 Use `/kb-capture:capture meeting` instead for post-hoc structuring of unstructured notes or voice recap.
+For a meeting that already happened and was recorded in Granola, `/kb-capture:capture meeting granola` pulls the transcript and fills the metadata from the matching calendar event — there is nothing to scaffold by hand.
 
 ## 1. Get metadata
 

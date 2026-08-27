@@ -30,9 +30,11 @@ kb_format = "1.0"
 # directories = ["tools"]
 
 # --- kb-capture plugin (only if installed) ----------------------------------
-# Which calendars and mailboxes the daily brief pulls from. Nothing here is
-# baked into the skill; an absent [capture] table means the brief is built from
-# your own input alone.
+# Which calendars, mailboxes and Granola folder the capture skills pull from.
+# The daily brief merges the calendars and mailboxes; a Granola meeting import
+# matches against the same calendars. Nothing here is baked into the skill; an
+# absent [capture] table means the brief is built from your own input alone and
+# a meeting import skips the calendar match.
 #
 # [capture]
 # timezone = "Europe/Berlin"
@@ -48,3 +50,8 @@ kb_format = "1.0"
 # name = "Gmail"                      # tag shown against each inbox line
 # provider = "gmail"                  # gmail | outlook
 # # folder = "Inbox"                  # outlook only
+#
+# Optional: scope /kb-capture:capture meeting granola to one Granola folder.
+# Omit to search every meeting the account can reach.
+# [capture.granola]
+# folder_id = "..."                   # from list_meeting_folders
