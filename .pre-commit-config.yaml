@@ -22,7 +22,7 @@ repos:
     # stops resolving, which for a package other repos install is the failure
     # worth catching early.
     - repo: https://github.com/astral-sh/uv-pre-commit
-      rev: 0.12.5
+      rev: 0.12.6
       hooks:
           - id: uv-lock
 
