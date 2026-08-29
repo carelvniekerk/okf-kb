@@ -278,6 +278,62 @@ Standard section header emojis: `## 🔗 Prerequisites`, `## 🎯 Key Takeaways`
 
 ⚠️ **Health badge rule**: never set the index health badge to `✓ passing` unless `kb-health` actually ran and returned exit code 0 in the current session. `kb-index` emits `unknown` by default and only claims passing with an explicit `--health-passing`.
 
+## Writing Style
+
+These rules govern the prose you produce: article bodies, `wiki/log.md` entries,
+index descriptions, commit messages, and your answers in conversation. They do
+not override the article structure or the emoji and badge conventions above,
+which are format rather than prose. Where a section is specified as a list, such
+as Key Takeaways, keep it a list.
+
+### Tone
+
+British English throughout.
+
+- Technical and research writing: formal, academic register, passive voice to
+  highlight the technology rather than the author.
+- Everything else: direct, active voice, lead with the recommendation.
+- Start with the answer. Do not preface it with background the reader already
+  has, and do not close by summarising what you have just said.
+- Prefer prose to bullet points where the content is not genuinely a list. No
+  bold lead-ins on every bullet.
+- In LaTeX, keep each sentence on a new line for version control, as with the
+  markdown here.
+
+### Punctuation
+
+- Never use em-dashes. Use commas, full stops, colons, or brackets instead. This
+  holds in any language you write in, German included, where a spaced en dash is
+  no substitute either, Duden convention notwithstanding. En dashes are for
+  numeric ranges (2019-2024) and for LaTeX where typography requires them.
+- Use the serial (Oxford) comma sparingly in English: omit it before "and" or
+  "or" unless the sentence is genuinely ambiguous without it. In German, no
+  comma before "und" or "oder" in a simple enumeration.
+- No scare quotes around invented labels.
+
+### Phrasing to avoid
+
+- Antithesis framing: "not just X, but Y", "this isn't X, it's Y".
+- Colon-then-reveal constructions: "The result: chaos."
+- Rule-of-three padding where two items or one would do.
+- Stock openers and closers: "Great question", restating the question back,
+  "In conclusion", "I hope this helps", "Let me know if you'd like me to...".
+- Filler hedges: "it's worth noting", "it's important to note", "that said",
+  "at its core", "in today's fast-paced world".
+- Overused vocabulary: delve, leverage, harness, unlock, seamless, robust,
+  holistic, pivotal, underscore, foster, testament to, landscape, realm,
+  tapestry, deep dive, game-changer, elevate, boasts.
+- Vague authority: "studies show", "experts agree", with no specific source.
+  Every claim here is traceable to `raw/`, so name the source instead.
+- Uniform sentence and paragraph length. Vary the rhythm.
+
+### Locale
+
+- Dates as YYYY-MM-DD, matching the frontmatter format. 24-hour clock. Metric
+  units.
+- Reply in the language the human writes in, and follow that language's
+  conventions for dates and decimals: DD.MM.YYYY and a decimal comma in German.
+
 ## Skills
 
 Provided by the `kb` plugin, and by `kb-ingest`, `kb-video` and `kb-capture`
