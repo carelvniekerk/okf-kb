@@ -158,7 +158,14 @@ Additionally:
 - Set `type`, `title` and a one-sentence `description` (the indexes are generated from `description`, so write it to stand alone).
 - Set `source_type` to the classification from 5a.
 - Add an entry to `sources` for each raw source: `id` (kebab-case, unique in the article), `resource` (repo-root-relative `raw/...` path), `title`, `author`, `last_modified`.
-- Stamp `generated` with your own model id, an ISO 8601 UTC timestamp, `skill: compile@kb-<version>` (the `version` in this plugin's `.claude-plugin/plugin.json`), and `commit` once committed. A bundle carrying its own in-repo copy of this skill instead stamps `compile@<sha>`, from `git log -1 --format=%h -- .claude/skills/compile/` — either way the point is that a hallucination traces to the exact producer version that emitted it.
+- Stamp `generated` with your own model id, an ISO 8601 UTC timestamp, `skill: compile@<sha>`, and `commit` once committed. The sha is the last commit to touch this skill's own source, so a hallucination traces back to the exact copy that emitted it. Take it from wherever the skill is installed:
+
+  ```bash
+  git -C "${CLAUDE_PLUGIN_ROOT}" log -1 --format=%h -- .   # installed as the kb plugin
+  git log -1 --format=%h -- .claude/skills/compile/        # a bundle's own in-repo copy
+  ```
+
+  Plugins carry no version number, so there is nothing else to stamp. If neither command resolves, write a bare `skill: compile` rather than inventing a version.
 - Leave `status` at `stable` unless the article is genuinely provisional (`draft`) or superseded (`deprecated`).
 - Add `stale_after` if the content is pinned to a moving target — library versions, build steps, a project's lifespan.
 - **Never write `verified`.** Absent means unverified, which is the honest state. Only `/kb:verify` may add it.

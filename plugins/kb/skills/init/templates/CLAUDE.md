@@ -85,7 +85,7 @@ resource: https://arxiv.org/abs/XXXX.XXXXX   # optional: canonical URI of the un
 generated:
   by: claude-sonnet-5          # the model that wrote it
   at: '2026-08-16T21:50:00Z'   # ISO 8601 UTC
-  skill: compile@kb-0.1.0      # producing skill @ its version
+  skill: compile@c8c310f       # producing skill @ the sha of its own last change
   commit: a8c8c81              # the commit that produced this content
 # `verified` is NEVER written by an agent — see the /kb:verify skill.
 
