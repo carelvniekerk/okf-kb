@@ -26,6 +26,7 @@ discovered root. Nothing downstream should ever do relative-path arithmetic.
 
 from __future__ import annotations
 
+import os
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -307,7 +308,13 @@ def _resolve(
         msg = f"{path}: paths.{key} must be relative to the bundle root"
         raise ConfigError(msg)
 
-    resolved = (root / candidate).resolve()
+    # Normalised lexically rather than with Path.resolve, because a zone may
+    # legitimately be a symlink to storage outside the bundle (an output/
+    # directory synced to cloud storage, a raw/ mirror on another volume), and
+    # following the link would read that layout as an escape. What has to be
+    # rejected is a *configured value* that traverses upward, which normpath
+    # collapses without touching the filesystem.
+    resolved = Path(os.path.normpath(root / candidate))
     if resolved != root and root not in resolved.parents:
         msg = f"{path}: paths.{key} escapes the bundle root"
         raise ConfigError(msg)

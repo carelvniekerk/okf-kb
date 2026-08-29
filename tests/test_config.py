@@ -155,6 +155,22 @@ def test_a_path_escaping_the_root_is_rejected(tmp_path):
         config.load_from(root)
 
 
+def test_a_zone_that_is_a_symlink_out_of_the_bundle_is_allowed(tmp_path):
+    """A zone may be a symlink to storage elsewhere.
+
+    Containment is a property of the configured *value*, not of what the
+    filesystem does with it. Resolving the link instead read a synced output/
+    directory as an escape and broke every command in the bundle.
+    """
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    root = _bundle(tmp_path / "bundle")
+    (root / "output").rmdir()
+    (root / "output").symlink_to(elsewhere, target_is_directory=True)
+
+    assert config.load_from(root).output == root / "output"
+
+
 # -- taxonomy ----------------------------------------------------------------
 #
 # The index's section headings were module constants naming one KB's subjects.
