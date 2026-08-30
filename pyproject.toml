@@ -32,10 +32,12 @@ kb-video = "okf_kb.video:main"
 tests = "pytest:main"
 
 [dependency-groups]
-# [ingest] is in dev because its tests exercise real fetching and rewriting and
-# should not silently skip. [video] stays out: it pulls mlx-whisper and torch,
-# which is too heavy to impose on every sync, and has no tests yet.
-dev = ["okf-kb[ingest]", "pytest>=8.3"]
+# dev carries both extras so a source checkout can run every kb-* command and
+# exercise every code path. [ingest] must be here regardless: its tests do real
+# fetching and rewriting and would silently skip without it. [video] costs a
+# torch download on every sync, which is the price of not having kb-video fail
+# only once someone reaches for it.
+dev = ["okf-kb[ingest,video]", "pytest>=8.3"]
 all = ["okf-kb[ingest,video]"]
 
 [build-system]

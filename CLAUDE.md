@@ -77,7 +77,7 @@ path you are in before you write.
 ## Commands
 
 ```bash
-uv sync                      # core + [ingest] + dev. NOT [video] — see below
+uv sync                      # core + dev, which carries [ingest] and [video]
 uv run tests                 # pytest, via the `tests` script in pyproject
 uvx ruff check . --fix
 uvx ruff format .
@@ -102,9 +102,12 @@ Heavy, platform-sensitive dependencies are opt-in:
 | `[video]` | `yt-dlp`, `mlx-whisper`, `python-slugify` — **and `ffmpeg`** | `kb-video` |
 | `[all]` | both | |
 
-`[video]` is deliberately outside the `dev` group: it pulls torch, which is too
-heavy to impose on every `uv sync`. `[ingest]` is inside it, because its tests
-exercise real fetching and rewriting and should not silently skip.
+The `dev` group pulls both, so a source checkout runs every `kb-*` command
+without a second install step. `[ingest]` has to be there because its tests do
+real fetching and rewriting and would silently skip otherwise; `[video]` is
+there despite the torch download, because the alternative is `kb-video` failing
+the first time a contributor reaches for it. Note that `[video]` still needs
+`ffmpeg` from Homebrew, which no `uv sync` will install for you.
 
 ### The rules
 
