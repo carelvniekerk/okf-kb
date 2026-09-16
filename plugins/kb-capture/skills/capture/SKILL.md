@@ -27,6 +27,16 @@ It turns any of these into structured markdown.
 Only restructure, reorder, and clean the user's words.
 Do not invent facts, examples, claims, attendees, decisions, or supporting detail that is not in the input.
 - If a section has no source material, **leave it empty or omit it** — do not pad.
+- Prose you compose (summary and context paragraphs, takeaways, decisions, the discussion narrative, brief notes) follows the Writing style section of the bundle's `CLAUDE.md`.
+Cleaning the user's words may change their phrasing to meet these rules, never their meaning.
+`## Raw Transcript`, `## Raw Input` and `## 📂 Raw Transcript` stay verbatim.
+The core rules, restated for bundles whose `CLAUDE.md` predates them:
+  - No em-dashes in prose. Use commas, full stops, colons or brackets.
+  - Plain sentences in the active voice, British English. Use the passive only where the agent is genuinely irrelevant or unknown.
+  - Sentence case for any heading you add. The template's own headings stay as written.
+  - No antithesis framing ("not just X, but Y"), colon-then-reveal ("The result: chaos"), rule-of-three padding, fragments for emphasis, or one-line paragraphs used as a drum beat.
+  - No filler hedges ("it's worth noting", "that said", "at its core") and none of: delve, leverage, harness, unlock, seamless, robust, holistic, pivotal, underscore, foster, testament to, landscape, realm, deep dive, game-changer, elevate.
+  - One name per thing. Do not vary the term for the same concept within a document.
 - External data (calendar, Gmail, Granola) is allowed but must be **clearly attributed** as agent-fetched, never mixed into the user's own words.
 - One sentence per line in body content (matches the repo's git-diff convention).
 - Standard markdown links only, never Obsidian `[[wikilinks]]`.

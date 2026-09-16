@@ -21,6 +21,14 @@ For starting a fresh day, use `/kb-capture:capture brief`.
 - **Never fabricate content.**
 Same rule as `/kb-capture:capture`: only restructure and clean the user's words.
 External data (calendar, Gmail) is agent-fetched and clearly attributed.
+- Notes, follow-up context and mood lines you write follow the Writing style section of the bundle's `CLAUDE.md`, with the transcript left verbatim.
+The core rules, restated for bundles whose `CLAUDE.md` predates them:
+  - No em-dashes in prose. Use commas, full stops, colons or brackets.
+  - Plain sentences in the active voice, British English. Use the passive only where the agent is genuinely irrelevant or unknown.
+  - Sentence case for any heading you add. The template's own headings stay as written.
+  - No antithesis framing ("not just X, but Y"), colon-then-reveal ("The result: chaos"), rule-of-three padding, fragments for emphasis, or one-line paragraphs used as a drum beat.
+  - No filler hedges ("it's worth noting", "that said", "at its core") and none of: delve, leverage, harness, unlock, seamless, robust, holistic, pivotal, underscore, foster, testament to, landscape, realm, deep dive, game-changer, elevate.
+  - One name per thing. Do not vary the term for the same concept within a document.
 - Edit the existing file **in place** — do not append session blocks.
 `/kb-capture:update-brief` is the single way to add mid-day content.
 - One sentence per line in body content.

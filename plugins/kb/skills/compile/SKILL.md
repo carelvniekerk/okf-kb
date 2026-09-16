@@ -151,6 +151,18 @@ Wait for the user's response before proceeding.
 
 ### 5d. Apply type-dependent integration strategy
 
+Everything you write into an article, its `description` and the log entry follows the Writing style section of the bundle's `CLAUDE.md`.
+The core of it is restated here because a bundle scaffolded before those rules existed will not have them:
+
+- No em-dashes in prose. Use commas, full stops, colons or brackets.
+- Plain sentences in the active voice, British English. Use the passive only where the agent is genuinely irrelevant or unknown.
+- Sentence case for any heading you add. The template's own headings stay as written.
+- No antithesis framing ("not just X, but Y"), colon-then-reveal ("The result: chaos"), rule-of-three padding, fragments for emphasis, or one-line paragraphs used as a drum beat.
+- No filler hedges ("it's worth noting", "that said", "at its core") and none of: delve, leverage, harness, unlock, seamless, robust, holistic, pivotal, underscore, foster, testament to, landscape, realm, deep dive, game-changer, elevate.
+- One name per thing. Do not vary the term for the same concept within a document.
+
+Quotations, code and equations stay as the source has them.
+
 #### Creating a new article
 
 Follow the standard article format from CLAUDE.md.
