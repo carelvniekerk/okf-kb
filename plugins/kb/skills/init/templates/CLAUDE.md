@@ -361,6 +361,9 @@ Write the way a knowledgeable person speaks. Specifically, do not use:
   convention notwithstanding. En dashes only for numeric ranges (2019–2024) and
   in LaTeX where typography requires them. This binds what you write, not what
   the tooling generates: `kb-index` writes its own separators into `INDEX.md`.
+  **YAML frontmatter is the exception.** An unquoted value containing `: ` does
+  not parse, so never swap an em-dash for a colon in `title`, `description` or
+  any other frontmatter value. Reword, use a full stop, or leave the em-dash.
 - Use the serial (Oxford) comma sparingly in English: omit it before "and" or
   "or" unless the sentence is genuinely ambiguous without it. In German, no
   comma before "und" or "oder" in a simple enumeration.

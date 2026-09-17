@@ -31,7 +31,7 @@ Do not invent facts, examples, claims, attendees, decisions, or supporting detai
 Cleaning the user's words may change their phrasing to meet these rules, never their meaning.
 `## Raw Transcript`, `## Raw Input` and `## 📂 Raw Transcript` stay verbatim.
 The core rules, restated for bundles whose `CLAUDE.md` predates them:
-  - No em-dashes in prose. Use commas, full stops, colons or brackets.
+  - No em-dashes in prose. Use commas, full stops, colons or brackets. Frontmatter is the exception: never swap an em-dash for a colon in a YAML value, because an unquoted `: ` does not parse. Reword, use a full stop, or leave the em-dash.
   - Plain sentences in the active voice, British English. Use the passive only where the agent is genuinely irrelevant or unknown.
   - Sentence case for any heading you add. The template's own headings stay as written.
   - No antithesis framing ("not just X, but Y"), colon-then-reveal ("The result: chaos"), rule-of-three padding, fragments for emphasis, or one-line paragraphs used as a drum beat.
