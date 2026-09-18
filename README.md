@@ -219,8 +219,8 @@ The read-only commands resolve their scope in this order, stopping at the first
 that yields anything:
 
 1. `--kb`, repeatable, taking a bundle name, a path, or `all`;
-2. the `OKF_KB_ROOT` environment variable;
-3. an enclosing `okf.toml`, when you are standing inside a bundle;
+2. an enclosing `okf.toml`, when you are standing inside a bundle;
+3. the `OKF_KB_ROOT` environment variable;
 4. an enclosing `.okf-kb.toml`: its `default`, or every bundle it lists;
 5. the user config's `default`.
 
