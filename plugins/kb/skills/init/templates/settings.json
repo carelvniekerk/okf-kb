@@ -10,11 +10,14 @@
             "Bash(kb-doctor:*)",
             "Bash(kb-ingest:*)",
             "Bash(kb-video:*)",
-            "Skill(kb:wiki-search)"
+            "Bash(kb-graph:*)",
+            "Bash(kb-read:*)",
+            "Skill(kb-query:wiki)"
         ]
     },
     "enabledPlugins": {
-        "kb@okf-kb": true{{EXTRA_PLUGINS}}
+        "kb@okf-kb": true,
+        "kb-query@okf-kb": true{{EXTRA_PLUGINS}}
     },
     "extraKnownMarketplaces": {
         "okf-kb": {

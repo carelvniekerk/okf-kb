@@ -34,6 +34,7 @@ CORE_COMMANDS = (
     "kb-provenance",
     "kb-export",
     "kb-graph",
+    "kb-read",
 )
 
 #: Which extra each plugin's skills depend on. The plugin names are the ones
