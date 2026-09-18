@@ -14,6 +14,14 @@ from __future__ import annotations
 from okf_kb import links
 
 
+def test_anchor_is_stripped_from_the_target():
+    assert links.targets("[x](./a.md#section)") == ["./a.md"]
+
+
+def test_a_pure_anchor_link_is_not_a_target():
+    assert links.targets("[x](#section)") == []
+
+
 def test_http_targets_are_skipped():
     text = "[a](https://example.com/a.md) [b](http://example.com) [c](./c.md)"
     assert links.targets(text) == ["./c.md"]
