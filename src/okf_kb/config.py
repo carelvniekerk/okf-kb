@@ -72,7 +72,7 @@ ENV_ROOT = "OKF_KB_ROOT"
 ALL_BUNDLES = "all"
 
 #: How a bundle came to be in scope, in resolution order.
-type BundleSource = Literal["flag", "env", "walk-up", "project", "user-config"]
+type BundleSource = Literal["flag", "walk-up", "env", "project", "user-config"]
 
 #: Default directory names, matching the canonical bundle layout.
 DEFAULT_WIKI_DIR = "wiki"
@@ -103,7 +103,7 @@ class ScopeError(ConfigError):
     report and carry on from.
 
     Attributes:
-        searched: One line per place that was consulted, in resolution order.
+        searched: One line per place that was consulted.
 
     """
 
@@ -439,10 +439,14 @@ def resolve_roots(
     """Decide which bundles a read-only command operates on.
 
     Resolution order: an explicit ``requested`` list (bundle names, paths, or
-    :data:`ALL_BUNDLES`), then :data:`ENV_ROOT`, then an enclosing
-    ``okf.toml``, then an enclosing ``.okf-kb.toml`` (its ``default``, or every
-    bundle it lists), then the user config's ``default``. The first step that
-    yields anything wins.
+    :data:`ALL_BUNDLES`), then an enclosing ``okf.toml``, then
+    :data:`ENV_ROOT`, then an enclosing ``.okf-kb.toml`` (its ``default``, or
+    every bundle it lists), then the user config's ``default``. The first step
+    that yields anything wins.
+
+    The enclosing bundle outranks the environment variable so that a skill
+    running inside a bundle, such as a compile searching for related articles,
+    always sees that bundle, even when ``OKF_KB_ROOT`` is exported globally.
 
     Args:
         requested: Values of a repeatable ``--kb`` option.
@@ -463,11 +467,11 @@ def resolve_roots(
 
     if requested:
         found = _from_flags(requested, bundle_root, project_file)
+    elif bundle_root is not None:
+        found = [Bundle(bundle_root.name, load_from(bundle_root), "walk-up")]
     elif env := os.environ.get(ENV_ROOT):
         root = Path(env).expanduser().resolve()
         found = [_bundle_at(root.name, root, f"${ENV_ROOT}", "env")]
-    elif bundle_root is not None:
-        found = [Bundle(bundle_root.name, load_from(bundle_root), "walk-up")]
     elif project_file is not None:
         found = _from_project(project_file)
     else:

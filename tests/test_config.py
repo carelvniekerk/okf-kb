@@ -444,12 +444,14 @@ def test_env_beats_the_project_file(scope, tmp_path, monkeypatch):
 
 
 @pytest.mark.usefixtures("scope")
-def test_env_beats_an_enclosing_bundle(tmp_path, monkeypatch):
+def test_an_enclosing_bundle_beats_env(tmp_path, monkeypatch):
+    """A globally exported OKF_KB_ROOT must not redirect a compile's search."""
     inside = _bundle(tmp_path / "inside")
     other = _bundle(tmp_path / "other")
     monkeypatch.setenv(config.ENV_ROOT, str(other))
-    (found,) = config.resolve_roots(start=inside)
-    assert found.config.root == other.resolve()
+    (found,) = config.resolve_roots(start=inside / "wiki")
+    assert found.source == "walk-up"
+    assert found.config.root == inside.resolve()
 
 
 @pytest.mark.usefixtures("scope")
