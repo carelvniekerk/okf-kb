@@ -237,8 +237,9 @@ run under the skill's own permissions, so the only grant a consuming project
 needs is the skill itself. Without it, Claude Code asks once per session, and a
 headless `claude -p` run is refused outright:
 
+In the consuming project's `.claude/settings.json`:
+
 ```json
-// .claude/settings.json in the consuming project
 {
     "permissions": {
         "allow": ["Skill(kb-query:wiki)"]

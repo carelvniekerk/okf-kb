@@ -207,6 +207,12 @@ If a `CLAUDE.md` already exists, **do not overwrite it.** Show the user what the
 template would add, and merge only what they accept. Their existing instructions
 may encode conventions you have not seen.
 
+If a `.claude/settings.json` already exists, merge the template's permissions
+and `enabledPlugins` into it rather than replacing it. Replace a
+`Skill(kb:wiki-search)` entry with `Skill(kb-query:wiki)`, because that skill no
+longer exists, and make sure `Bash(kb-graph:*)`, `Bash(kb-read:*)` and
+`"kb-query@okf-kb": true` are present. Check the merged file parses.
+
 The same applies to `.vscode/settings.json` and `.vscode/tasks.json`, which
 `/kb:init` also writes from `../init/templates/`. Offer them, and where a file is
 already present **merge rather than replace** — an adopted folder's editor config
