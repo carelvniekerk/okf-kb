@@ -57,11 +57,13 @@ health checks, and commits.
 Then you *ask questions*, which is the point of having done any of it:
 
 ```bash
-/kb:wiki-search what do we know about speculative decoding
+/kb-query:wiki what do we know about speculative decoding
 ```
 
 Wiki first, web second — the skill exists to stop an agent googling something
-you already wrote down.
+you already wrote down. It searches, follows the wiki's cross-links and
+backlinks when one article is not enough, and works from any project, not only
+from inside the knowledge base.
 
 Periodically:
 
@@ -88,6 +90,7 @@ Install the skills:
 ```bash
 claude plugin marketplace add carelvniekerk/okf-kb
 claude plugin install kb@okf-kb
+claude plugin install kb-query@okf-kb
 ```
 
 Then, in the directory you want the knowledge base to live in:
@@ -113,7 +116,7 @@ skill that needs it runs:
 
 | Plugins you want | Install |
 |---|---|
-| `kb`, `kb-capture` | `okf-kb` |
+| `kb`, `kb-query`, `kb-capture` | `okf-kb` |
 | …and `kb-ingest` | `okf-kb[ingest]` |
 | …and `kb-video` | `okf-kb[video]` |
 | …both | `okf-kb[all]` |
@@ -135,7 +138,8 @@ compose it that way. Paste what they give you rather than writing your own.
 
 | Plugin | Skills | Needs |
 |---|---|---|
-| `kb` | `init`, `adopt`, `compile`, `health`, `verify`, `wiki-search` | core install |
+| `kb` | `init`, `adopt`, `compile`, `health`, `verify` | core install |
+| `kb-query` | `wiki` | core install; read-only |
 | `kb-ingest` | `ingest`, `transcribe` | `[ingest]` extra |
 | `kb-video` | `video` | `[video]` extra + `ffmpeg` |
 | `kb-capture` | `capture`, `meeting`, `update-brief` | core install + calendar/mail connectors; ships the Granola MCP |
@@ -166,11 +170,12 @@ The skills drive these; you can also run them directly.
 | `kb-search` | BM25 full-text search with tag and type filters, across one or several bundles |
 | `kb-stats` | Article counts, word counts, link density, orphans |
 | `kb-graph` | Walk the wiki's cross-links: section roots, one article's backlinks, neighbours, shortest path |
+| `kb-read` | Print one article, or one section of it, from any knowledge base in scope; refuses paths outside the wikis |
 | `kb-provenance` | Map, retract, classify and migrate source provenance |
 | `kb-ingest` | Fetch arXiv papers, extract PDFs, convert HTML, localise images |
 | `kb-export` | Marp slide decks, or the whole wiki flattened to one file |
 | `kb-video` | Stage a YouTube video's captions, audio and frames |
-| `kb-doctor` | Report which extras are installed, and what to run to add the rest |
+| `kb-doctor` | Report which extras are installed, and what to run to add the rest; `kb-doctor bundles` lists the knowledge bases in scope |
 
 Every command finds its bundle by walking up from the working directory looking
 for `okf.toml`, the way `git` finds `.git`. They run from anywhere inside a
@@ -227,6 +232,20 @@ Only reading goes through this. `kb-index`, `kb-health`, `kb-provenance` and
 the ingest tools still find their bundle by walking up, so nothing can compile
 or reindex a knowledge base you are not standing in.
 
+The `kb-query` plugin's `wiki` skill drives all of this. Its `kb-*` commands
+run under the skill's own permissions, so the only grant a consuming project
+needs is the skill itself. Without it, Claude Code asks once per session, and a
+headless `claude -p` run is refused outright:
+
+```json
+// .claude/settings.json in the consuming project
+{
+    "permissions": {
+        "allow": ["Skill(kb-query:wiki)"]
+    }
+}
+```
+
 ## okf.toml
 
 One file at the bundle root marks a directory as a knowledge base and describes
@@ -243,7 +262,7 @@ Adding a wiki section is an edit to this file, not a code change. See
 Two halves of one product, versioned and released together:
 
 - **`src/okf_kb/`** — the Python package behind the `kb-*` commands.
-- **`plugins/`** — a Claude Code marketplace of four plugins, whose skills
+- **`plugins/`** — a Claude Code marketplace of five plugins, whose skills
   drive those commands.
 
 This repo is *not itself* a knowledge base — there is no `wiki/` or `raw/`

@@ -301,4 +301,26 @@ def test_cli_shortest_path_reports_no_path_as_null():
         ["shortest-path", "b.md", "e.md", "--kb", "kb", "--json-output"],
     )
     assert result.exit_code == 0, result.output
-    assert json.loads(result.output) == {"bundle": "kb", "path": None}
+    assert json.loads(result.output) == {"bundle": "kb", "path": None, "hops": None}
+
+
+@pytest.mark.usefixtures("two_bundles")
+def test_cli_shortest_path_draws_each_hop_the_way_it_was_linked():
+    """The hop from a to c is a backlink, the hop from c to d a forward link."""
+    result = runner.invoke(graph.app, ["shortest-path", "a.md", "d.md", "--kb", "kb"])
+    assert result.exit_code == 0, result.output
+    assert result.output.strip() == "a.md <- c.md -> d.md"
+
+    result = runner.invoke(
+        graph.app,
+        ["shortest-path", "a.md", "d.md", "--kb", "kb", "--json-output"],
+    )
+    assert json.loads(result.output)["hops"] == ["backward", "forward"]
+
+
+def test_direction_of_a_mutual_link_is_both(tmp_path):
+    wiki = tmp_path / "wiki"
+    _write(wiki, "x.md", _article("X", "[y](./y.md)"))
+    _write(wiki, "y.md", _article("Y", "[x](./x.md)"))
+    g = graph.Graph.from_wiki(wiki)
+    assert g.direction(wiki / "x.md", wiki / "y.md") == "both"

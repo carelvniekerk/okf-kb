@@ -38,6 +38,7 @@ src/okf_kb/            # the Python package — one module per kb-* command
 ├── okf.py             # OKF v0.2 schema construction
 ├── links.py           # the ONLY markdown link scanner
 ├── graph.py           # kb-graph: the link graph, backlinks, traversal
+├── read.py            # kb-read: print one article from any bundle in scope
 ├── gitmeta.py         # git archaeology, for provenance backfill
 ├── extras.py          # optional-dependency handling. See "Extras" below
 ├── doctor.py          # kb-doctor, and kb-doctor bundles
@@ -55,13 +56,14 @@ src/okf_kb/            # the Python package — one module per kb-* command
     └── transcribe.py  #   captions, and MLX Whisper fallback
 
 plugins/               # the Claude Code marketplace — one directory per plugin
-├── kb/                # init, adopt, compile, health, verify, wiki-search
+├── kb/                # init, adopt, compile, health, verify
 │   └── skills/init/templates/   # what /kb:init scaffolds INTO a bundle
+├── kb-query/          # wiki (read-only: search, graph, read)
 ├── kb-ingest/         # ingest, transcribe            needs [ingest]
 ├── kb-video/          # video                         needs [video] + ffmpeg
 └── kb-capture/        # capture, meeting, update-brief
 
-.claude-plugin/marketplace.json   # lists the four plugins
+.claude-plugin/marketplace.json   # lists the five plugins
 okf.toml.example                  # every key, documented, with its default
 tests/                            # pytest, one file per module
 ```

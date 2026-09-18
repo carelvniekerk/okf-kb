@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "kb",
-  "description": "Core workflow for an Open Knowledge Format knowledge base. Initialise a new bundle or adopt an existing folder of markdown, compile raw sources into a self-contained wiki with tracked provenance, search it before reaching for the web, check its health, and record human sign-off on an article. Requires the okf-kb Python package for the kb-* tools.",
+  "description": "Core workflow for an Open Knowledge Format knowledge base. Initialise a new bundle or adopt an existing folder of markdown, compile raw sources into a self-contained wiki with tracked provenance, check its health, and record human sign-off on an article. Searching the wiki lives in the kb-query plugin. Requires the okf-kb Python package for the kb-* tools.",
   "author": {
     "name": "Carel van Niekerk",
     "email": "code@carelvanniekerk.com",

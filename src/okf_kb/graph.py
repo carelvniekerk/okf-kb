@@ -25,6 +25,7 @@ import os
 import re
 from collections import deque
 from dataclasses import dataclass, field
+from itertools import pairwise
 
 # Typer resolves these annotations at runtime to parse CLI arguments, so
 # Path cannot move into a type-checking block.
@@ -223,17 +224,12 @@ class Graph:
             GraphError: If no reading of the path lies inside the wiki.
 
         """
-        given = Path(path).expanduser()
-        candidates = (
-            [given] if given.is_absolute() else [self.root / given, self.wiki / given]
-        )
-        for candidate in candidates:
-            resolved = candidate.resolve()
-            if resolved == self.wiki or self.wiki in resolved.parents:
-                return resolved
-        name = self.bundle or "this bundle"
-        msg = f"{path} is not inside the wiki of {name} ({self.wiki})"
-        raise GraphError(msg)
+        resolved = canonicalise(path, self.wiki, self.root)
+        if resolved is None:
+            name = self.bundle or "this bundle"
+            msg = f"{path} is not inside the wiki of {name} ({self.wiki})"
+            raise GraphError(msg)
+        return resolved
 
     def has(self, path: Path | str) -> bool:
         """Whether a path names a node of this graph.
@@ -387,6 +383,32 @@ class Graph:
                     queue.append(neighbour)
         return None
 
+    def direction(self, a: Path, b: Path) -> str:
+        """Say which way the link between two adjacent nodes was written.
+
+        Args:
+            a: One node's path.
+            b: The next node's path.
+
+        Returns:
+            ``forward`` when ``a`` links to ``b``, ``backward`` when ``b``
+            links to ``a``, and ``both`` when each links to the other.
+
+        Raises:
+            GraphError: If neither links to the other.
+
+        """
+        forward = b in self._nodes[a].out
+        backward = a in self._nodes[b].out
+        if forward and backward:
+            return "both"
+        if forward:
+            return "forward"
+        if backward:
+            return "backward"
+        msg = f"{self.display(a)} and {self.display(b)} are not linked"
+        raise GraphError(msg)
+
     def orphans(self) -> tuple[Node, ...]:
         """Find articles nothing links to.
 
@@ -452,6 +474,33 @@ class Graph:
                     distances[neighbour] = distance + 1
                     queue.append(neighbour)
         return distances
+
+
+def canonicalise(path: Path | str, wiki: Path, root: Path) -> Path | None:
+    """Place a path inside a wiki, whichever form it was written in.
+
+    A relative path is tried against the bundle root first and the wiki
+    second, so ``wiki/a.md`` and ``a.md`` name the same file. Symlinks are
+    followed before the containment check, so a link inside the wiki that
+    points outside it does not count as inside.
+
+    Args:
+        path: An absolute, root-relative or wiki-relative path.
+        wiki: The resolved wiki directory.
+        root: The resolved bundle root.
+
+    Returns:
+        The resolved absolute path, or ``None`` when no reading of it lies
+        inside the wiki. The file need not exist.
+
+    """
+    given = Path(path).expanduser()
+    candidates = [given] if given.is_absolute() else [root / given, wiki / given]
+    for candidate in candidates:
+        resolved = candidate.resolve()
+        if resolved == wiki or wiki in resolved.parents:
+            return resolved
+    return None
 
 
 def locate(graphs: Sequence[Graph], path: Path | str) -> tuple[Graph, Node]:
@@ -553,6 +602,9 @@ def _make_node(
 
 
 # -- CLI -----------------------------------------------------------------------
+
+#: How ``shortest-path`` draws each hop.
+_ARROWS = {"forward": "->", "backward": "<-", "both": "<->"}
 
 KbOption = Annotated[
     list[str] | None,
@@ -758,6 +810,10 @@ def shortest_path(
 ) -> None:
     """Show a shortest chain of links between two articles, in either direction.
 
+    Each hop is drawn the way its link was written: ``a -> b`` when ``a``
+    links to ``b``, ``a <- b`` for a backlink, ``a <-> b`` for both. The JSON
+    carries the same as ``hops``: ``forward``, ``backward`` or ``both``.
+
     Raises:
         Exit: With status 1 when an end is not a node in scope, or the two ends
             are in different bundles.
@@ -778,14 +834,22 @@ def shortest_path(
         raise typer.Exit(1)
 
     chain = graph_a.shortest_path(node_a.path, node_b.path)
-    rels = None if chain is None else [n.rel.as_posix() for n in chain]
+    if chain is None:
+        if json_output:
+            _emit({"bundle": graph_a.bundle, "path": None, "hops": None})
+        else:
+            typer.echo(f"no path between {a} and {b}")
+        return
+
+    rels = [n.rel.as_posix() for n in chain]
+    hops = [graph_a.direction(x.path, y.path) for x, y in pairwise(chain)]
     if json_output:
-        _emit({"bundle": graph_a.bundle, "path": rels})
+        _emit({"bundle": graph_a.bundle, "path": rels, "hops": hops})
         return
-    if rels is None:
-        typer.echo(f"no path between {a} and {b}")
-        return
-    typer.echo(" -> ".join(rels))
+    line = rels[0]
+    for rel, hop in zip(rels[1:], hops, strict=True):
+        line += f" {_ARROWS[hop]} {rel}"
+    typer.echo(line)
 
 
 if __name__ == "__main__":

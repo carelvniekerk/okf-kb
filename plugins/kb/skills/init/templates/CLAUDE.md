@@ -399,8 +399,8 @@ Avoid:
 
 ## Skills
 
-Provided by the `kb` plugin, and by `kb-ingest`, `kb-video` and `kb-capture`
-where those are installed. A skill is addressed by the plugin that ships it, so
+Provided by the `kb` and `kb-query` plugins, and by `kb-ingest`, `kb-video` and
+`kb-capture` where those are installed. A skill is addressed by the plugin that ships it, so
 capture is `/kb-capture:capture`, not `/kb:capture`:
 
 | Skill | Purpose |
@@ -408,14 +408,14 @@ capture is `/kb-capture:capture`, not `/kb:capture`:
 | `/kb:compile` | Integrate `raw/` sources into `wiki/`. The main pipeline. |
 | `/kb:health` | Full wiki health check with LLM-level analysis. |
 | `/kb:verify` | Record a human sign-off on an article. The **only** path to a `human:` actor. |
-| `/kb:wiki-search` | Internal knowledge lookup. Use before any external search. |
+| `/kb-query:wiki` | Search the wiki and follow its links. Use before any external search. |
 | `/kb:init` | Scaffold a new knowledge base. |
 | `/kb:adopt` | Take over an existing folder of markdown. |
 {{INGEST_SKILLS}}{{VIDEO_SKILLS}}{{CAPTURE_SKILLS}}
 
 ## Answering questions (Q&A)
 
-1. Run `/kb:wiki-search` to orient yourself. **Wiki first, web second**, always.
+1. Run `/kb-query:wiki` to orient yourself. **Wiki first, web second**, always.
 2. Read relevant wiki articles.
 3. If the wiki does not contain enough, check `raw/` sources directly.
 4. Answer in the conversation.
@@ -439,6 +439,8 @@ Each finds this bundle by walking up for `okf.toml`, so they run from anywhere i
 
 - **`kb-search <query>`**: BM25 search with `--tag` / `--type` filtering. `--json-output` for structured results.
 - **`kb-stats`**: article count, word count, link density, orphans, most-connected articles.
+- **`kb-graph`**: walk the wiki's cross-links. `roots` lists the root index sections, `node <path>` shows an article's links and backlinks, `neighbours <path> --depth N` expands from it, `shortest-path <a> <b>` connects two.
+- **`kb-read <path>`**: print one article, optionally one `--section`. Read-only, and refuses anything outside the wiki.
 - **`kb-index`**: regenerate every `INDEX.md` from article frontmatter. `--check` verifies without writing. The compile-date badge is **preserved**, not recomputed; `--stamp-compiled` moves it to today and is reserved for `/kb:compile`.
 - **`kb-health`**: automated health checks; writes a timestamped report to `output/` and exits non-zero on issues.
 - **`kb-provenance`**: `map`, `affected`, `classify`, `migrate`.

@@ -35,13 +35,14 @@ would not want ignored — notes, papers, an existing wiki — stop and recommen
 The skills are useless without the package, and each optional plugin is useless
 without its extra. Both are settled here, before anything is scaffolded.
 
-**First, list which of the four plugins are enabled in this session** —
-`kb`, `kb-ingest`, `kb-video`, `kb-capture`. This drives the install, so
+**First, list which of the five plugins are enabled in this session** —
+`kb`, `kb-query`, `kb-ingest`, `kb-video`, `kb-capture`. This drives the install, so
 establish it before running anything. Each maps to an extra:
 
 | Plugin enabled | Extra it needs |
 |---|---|
 | `kb` | none — core |
+| `kb-query` | none (core install) |
 | `kb-capture` | none — core |
 | `kb-ingest` | `ingest` |
 | `kb-video` | `video`, plus `ffmpeg` on the system |
@@ -66,7 +67,7 @@ user the command matching the plugins they have enabled — never a fixed one:
 
 | Plugins enabled | Install |
 |---|---|
-| `kb` and/or `kb-capture` only | `uv tool install "okf-kb @ git+ssh://git@github.com/carelvniekerk/okf-kb"` |
+| `kb`, `kb-query` and/or `kb-capture` only | `uv tool install "okf-kb @ git+ssh://git@github.com/carelvniekerk/okf-kb"` |
 | …plus `kb-ingest` | `uv tool install "okf-kb[ingest] @ git+ssh://git@github.com/carelvniekerk/okf-kb"` |
 | …plus `kb-video` | `uv tool install "okf-kb[video] @ git+ssh://git@github.com/carelvniekerk/okf-kb"` |
 | …both | `uv tool install "okf-kb[all] @ git+ssh://git@github.com/carelvniekerk/okf-kb"` |
