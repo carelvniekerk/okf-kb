@@ -36,9 +36,10 @@ src/okf_kb/            # the Python package — one module per kb-* command
 ├── config.py          # bundle discovery + okf.toml. Everything goes through here
 ├── frontmatter.py     # the ONLY place YAML frontmatter is read or written
 ├── okf.py             # OKF v0.2 schema construction
+├── links.py           # the ONLY markdown link scanner
 ├── gitmeta.py         # git archaeology, for provenance backfill
 ├── extras.py          # optional-dependency handling. See "Extras" below
-├── doctor.py          # kb-doctor
+├── doctor.py          # kb-doctor, and kb-doctor bundles
 ├── index_gen.py       # kb-index
 ├── health.py          # kb-health
 ├── search.py          # kb-search
@@ -173,6 +174,27 @@ calls its zones `notes/` and `articles/` keeps calling them that.
 **`frontmatter.py` owns every read and write of YAML frontmatter.** Do not
 hand-roll a regex. The regex parsers it replaced could not represent nested
 structures, which OKF v0.2 requires.
+
+**Only read-only commands accept `--kb`.** `kb-search`, `kb-graph`, `kb-read`
+and `kb-doctor bundles` resolve their scope through `config.resolve_roots`,
+which can reach a bundle the user is not standing in. Every command that writes
+(`kb-index`, `kb-health`, `kb-provenance`, `kb-ingest`, `kb-video`,
+`kb-export`) keeps walk-up discovery through `config.load()`, so nothing can
+compile, reindex or report into a bundle from outside it. Do not add `--kb` to
+a writing command.
+
+**Only `config.resolve_roots` reads the pointer files.** The user config
+(`$XDG_CONFIG_HOME/okf-kb/config.toml`) and a project's `.okf-kb.toml` are read
+there, through the helpers it calls, and nowhere else. `load()` and
+`find_root()` must never consult them. The
+project file is not called `okf.toml` for the same reason: that name marks a
+directory as a knowledge base to every writing tool.
+
+**`links.py` owns every markdown link parse.** `targets()` keeps any internal
+target, which the broken-link check needs; `internal_targets()` keeps only
+`.md` targets, which link counts and the graph need. The image and
+`## Sources` checks in `health.py` keep their own narrower patterns; anything
+new that follows links between articles goes through `links.py`.
 
 **Configuration is a config change, not a code change.** Adding a wiki section
 is an edit to `okf.toml`. If you find yourself adding a section name to a
