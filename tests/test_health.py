@@ -312,6 +312,20 @@ def test_orphan_article_is_reported(tmp_path):
     assert "beta.md" in issues[0]
 
 
+def test_an_anchored_link_keeps_its_target_from_being_an_orphan(tmp_path):
+    _write(tmp_path, "INDEX.md", "# Index\n\n- [Alpha](./alpha.md)\n")
+    _write(tmp_path, "alpha.md", VALID_ARTICLE + "\nSee [beta](./beta.md#details).\n")
+    _write(tmp_path, "beta.md", "---\ntype: concept\n---\n\n# Beta\n")
+    assert health.check_orphans(tmp_path) == []
+
+
+def test_an_anchored_link_to_a_missing_file_is_broken(tmp_path):
+    _write(tmp_path, "alpha.md", "See [gone](./gone.md#details).\n")
+    issues = health.check_wiki_links(tmp_path)
+    assert len(issues) == 1
+    assert "./gone.md" in issues[0]
+
+
 # -- check_sources_listed ----------------------------------------------------
 
 

@@ -18,11 +18,13 @@ from urllib.parse import unquote
 if TYPE_CHECKING:
     from pathlib import Path
 
-#: Matches ``[label](target)``. The target may not contain ``#`` or whitespace,
-#: so a link carrying an anchor or a title does not match at all. It also matches the
-#: ``[alt](src)`` inside an image reference, which is what lets the broken-link
-#: check validate image targets.
-LINK_RE = re.compile(r"\[([^\]]*)\]\(([^)#\s]+)\)")
+#: Matches ``[label](target)``, with the target in group 2. A trailing anchor is
+#: matched and dropped, so ``[x](./a.md#section)`` yields ``./a.md``; a
+#: pure-anchor link such as ``[x](#section)`` does not match. A link carrying a
+#: title (``[x](./a.md "Title")``) still does not match. The pattern also
+#: matches the ``[alt](src)`` inside an image reference, which is what lets the
+#: broken-link check validate image targets.
+LINK_RE = re.compile(r"\[([^\]]*)\]\(([^)#\s]+)(?:#[^)\s]*)?\)")
 
 #: Prefix that marks a target as external rather than a path in the bundle.
 _EXTERNAL_PREFIX = "http"
