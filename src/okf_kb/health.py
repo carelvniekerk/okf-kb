@@ -31,7 +31,7 @@ from urllib.parse import unquote
 
 import typer
 
-from okf_kb import config, frontmatter
+from okf_kb import config, frontmatter, links
 from okf_kb.frontmatter import is_article
 
 app = typer.Typer(help="Run automated health checks on the knowledge base wiki.")
@@ -75,21 +75,13 @@ def _frontmatter_of(md_file: Path) -> frontmatter.Frontmatter:
     return data
 
 
-def _resolve_link(link: str, source_file: Path) -> Path:
-    """Resolve a relative markdown link to an absolute path."""
-    return (source_file.parent / unquote(link)).resolve()
-
-
 def check_wiki_links(wiki_dir: Path) -> list[str]:
     """Find broken internal markdown links in wiki articles."""
     issues = []
     for md_file in sorted(wiki_dir.rglob("*.md")):
         text = md_file.read_text(encoding="utf-8")
-        for match in re.finditer(r"\[([^\]]*)\]\(([^)#\s]+)\)", text):
-            target = match.group(2)
-            if target.startswith("http"):
-                continue
-            resolved = _resolve_link(target, md_file)
+        for target in links.targets(text):
+            resolved = links.resolve(target, md_file)
             if not resolved.exists():
                 rel = md_file.relative_to(wiki_dir.parent)
                 issues.append(f"Broken link in `{rel}`: `{target}`")
@@ -108,7 +100,7 @@ def check_image_refs(scan_dirs: list[Path], root: Path) -> list[str]:
                 src = match.group(1)
                 if src.startswith("http"):
                     continue
-                resolved = _resolve_link(src, md_file)
+                resolved = links.resolve(src, md_file)
                 if not resolved.exists():
                     rel = md_file.relative_to(root)
                     issues.append(f"Broken image in `{rel}`: `{src}`")
@@ -408,7 +400,7 @@ def check_stale_sources(wiki_dir: Path) -> list[str]:
                 continue
             for match in source_pattern.finditer(line):
                 raw_link = match.group(2)
-                resolved = _resolve_link(raw_link, md_file)
+                resolved = links.resolve(raw_link, md_file)
                 if not resolved.exists():
                     rel = md_file.relative_to(wiki_dir)
                     issues.append(
@@ -425,12 +417,7 @@ def check_orphans(wiki_dir: Path) -> list[str]:
 
     for md_file in md_files:
         text = md_file.read_text(encoding="utf-8")
-        for match in re.finditer(r"\[([^\]]*)\]\(([^)#\s]+)\)", text):
-            target = match.group(2)
-            if target.startswith("http"):
-                continue
-            resolved = _resolve_link(target, md_file)
-            linked.add(resolved)
+        linked.update(links.resolve(target, md_file) for target in links.targets(text))
 
     root = wiki_dir.resolve()
     orphans = [f for f in all_files if f not in linked and is_article(f)]

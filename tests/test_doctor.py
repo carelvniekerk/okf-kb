@@ -2,7 +2,10 @@
 
 The skills lean on this command's exit code to decide whether to warn, so the
 exit contract matters more than the wording: a missing extra is reported but
-not an error unless the caller said it needed one.
+not an error unless the caller said it needed one. The same holds for
+``kb-doctor bundles``: no knowledge base in scope is a state the query skill
+carries on from, while a config naming a directory that is not a bundle is an
+error it must surface.
 """
 
 # ruff: noqa: S101, D100, D101, D102, D103, ANN001, ANN201, PLR2004, SLF001, INP001, RUF100
@@ -10,11 +13,15 @@ not an error unless the caller said it needed one.
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
 import pytest
 from typer.testing import CliRunner
 
-from okf_kb import doctor, extras
+from okf_kb import config, doctor, extras
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 runner = CliRunner()
 
@@ -101,4 +108,98 @@ def test_a_broken_core_install_exits_non_zero(monkeypatch):
 
 
 def test_every_plugin_maps_to_a_real_extra():
-    assert set(doctor.PLUGIN_EXTRAS.values()) <= set(extras.EXTRA_MODULES)
+    # None marks a core-only plugin, which needs no extra at all.
+    needed = {extra for extra in doctor.PLUGIN_EXTRAS.values() if extra is not None}
+    assert needed <= set(extras.EXTRA_MODULES)
+
+
+@pytest.mark.usefixtures("_installed")
+def test_require_accepts_a_core_only_plugin():
+    assert runner.invoke(doctor.app, ["--require", "kb-query"]).exit_code == 0
+
+
+# -- kb-doctor bundles -------------------------------------------------------
+
+
+@pytest.fixture
+def scope(tmp_path, monkeypatch) -> Path:
+    """Isolate bundle resolution and stand in an empty project directory."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    monkeypatch.delenv(config.ENV_ROOT, raising=False)
+    here = tmp_path / "project"
+    here.mkdir()
+    monkeypatch.chdir(here)
+    return here
+
+
+def _kb(root: Path, articles: int) -> Path:
+    (root / "wiki").mkdir(parents=True)
+    (root / config.CONFIG_FILENAME).write_text("", encoding="utf-8")
+    (root / "wiki" / "INDEX.md").write_text("# Index\n", encoding="utf-8")
+    for n in range(articles):
+        (root / "wiki" / f"a{n}.md").write_text("---\ntype: concept\n---\n")
+    return root
+
+
+def test_bundles_lists_every_bundle_in_scope(scope, tmp_path):
+    work = _kb(tmp_path / "work", 2)
+    client = _kb(tmp_path / "client", 1)
+    (scope / config.PROJECT_FILENAME).write_text(
+        f'[paths]\nwork = "{work}"\nclient = "{client}"\n',
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(doctor.app, ["bundles", "--json-output"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert "searched" not in payload
+    assert payload["bundles"] == [
+        {
+            "name": "work",
+            "path": str(work.resolve()),
+            "source": "project",
+            "ok": True,
+            "articles": 2,
+        },
+        {
+            "name": "client",
+            "path": str(client.resolve()),
+            "source": "project",
+            "ok": True,
+            "articles": 1,
+        },
+    ]
+
+
+@pytest.mark.usefixtures("scope")
+def test_bundles_human_output_names_each_bundle(tmp_path):
+    work = _kb(tmp_path / "work", 3)
+    result = runner.invoke(doctor.app, ["bundles", "--kb", str(work)])
+    assert result.exit_code == 0
+    assert "work" in result.output
+    assert "3 articles" in result.output
+    assert "flag" in result.output
+
+
+@pytest.mark.usefixtures("scope")
+def test_bundles_with_nothing_in_scope_is_not_an_error():
+    result = runner.invoke(doctor.app, ["bundles", "--json-output"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["bundles"] == []
+    assert len(payload["searched"]) == 4
+
+
+def test_bundles_with_a_broken_declaration_is_an_error(scope, tmp_path):
+    (tmp_path / "empty").mkdir()
+    (scope / config.PROJECT_FILENAME).write_text(
+        f'[paths]\nwork = "{tmp_path / "empty"}"\n',
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(doctor.app, ["bundles"])
+
+    assert result.exit_code == 1
+    assert "holds no okf.toml" in result.output

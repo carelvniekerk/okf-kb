@@ -2,48 +2,17 @@
 
 from __future__ import annotations
 
-import re
-
 # Typer resolves these annotations at runtime to parse CLI arguments, so
 # Path cannot move into a type-checking block.
 from pathlib import Path  # noqa: TC003
 from typing import Annotated
-from urllib.parse import unquote
 
 import typer
 
-from okf_kb import config
+from okf_kb import config, links
 from okf_kb.frontmatter import is_article
 
 app = typer.Typer(help="Print statistics about the knowledge base wiki.")
-
-#: Matches ``[label](target)``. Anchors and whitespace terminate the target, so
-#: this stays in step with ``health.py``'s link scanner.
-LINK_RE = re.compile(r"\[([^\]]*)\]\(([^)#\s]+)\)")
-
-
-def _resolve_link(link: str, source_file: Path) -> Path:
-    """Resolve a relative markdown link to an absolute path.
-
-    Args:
-        link: The raw link target as written in the markdown.
-        source_file: The file the link appears in.
-
-    Returns:
-        The absolute path the link points at. Percent-encoding is decoded first,
-        since wiki links to files with spaces are written encoded.
-
-    """
-    return (source_file.parent / unquote(link)).resolve()
-
-
-def _internal_md_links(text: str) -> list[str]:
-    """Extract internal markdown link targets that point at ``.md`` files."""
-    return [
-        target
-        for _, target in LINK_RE.findall(text)
-        if not target.startswith("http") and target.endswith(".md")
-    ]
 
 
 def compute_stats(wiki_dir: Path) -> dict:
@@ -78,10 +47,10 @@ def compute_stats(wiki_dir: Path) -> dict:
         text = md_file.read_text(encoding="utf-8")
         rel_path = str(md_file.relative_to(wiki_dir))
         absolute = md_file.resolve()
-        targets = _internal_md_links(text)
+        targets = links.internal_targets(text)
 
         for target in targets:
-            resolved = _resolve_link(target, md_file)
+            resolved = links.resolve(target, md_file)
             if not resolved.exists():
                 broken_links.append(f"{rel_path} -> {target}")
             if resolved in incoming_counts:

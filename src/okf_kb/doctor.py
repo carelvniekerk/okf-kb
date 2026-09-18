@@ -6,7 +6,9 @@ there. Nothing short of running a real conversion tells you, and by then the
 user is already mid-task.
 
 ``kb-doctor`` is the probe that answers it up front: what is installed, what a
-given plugin needs, and the one command that closes the gap.
+given plugin needs, and the one command that closes the gap. ``kb-doctor
+bundles`` answers the other question a skill needs settled before it starts:
+which knowledge bases are in scope from where it is standing.
 """
 
 from __future__ import annotations
@@ -18,7 +20,8 @@ from typing import Annotated
 
 import typer
 
-from okf_kb import extras
+from okf_kb import config, extras
+from okf_kb.frontmatter import is_article
 
 app = typer.Typer(help="Check the okf-kb install and report what is missing.")
 
@@ -33,10 +36,12 @@ CORE_COMMANDS = (
 )
 
 #: Which extra each plugin's skills depend on. The plugin names are the ones
-#: users pass to ``claude plugin install``.
-PLUGIN_EXTRAS = {
+#: users pass to ``claude plugin install``. ``None`` means the plugin needs only
+#: the core install; it is listed so ``--require`` accepts its name.
+PLUGIN_EXTRAS: dict[str, str | None] = {
     "kb-ingest": "ingest",
     "kb-video": "video",
+    "kb-query": None,
 }
 
 
@@ -49,6 +54,17 @@ class ExtraState:
     missing_modules: list[str] = field(default_factory=list)
     missing_binaries: list[str] = field(default_factory=list)
     install: str = ""
+
+
+@dataclass
+class BundleState:
+    """One bundle in scope, as ``kb-doctor bundles`` reports it."""
+
+    name: str
+    path: str
+    source: str
+    ok: bool
+    articles: int
 
 
 @dataclass
@@ -96,15 +112,16 @@ def _extra_state(extra: str) -> ExtraState:
     )
 
 
-@app.command()
+@app.callback(invoke_without_command=True)
 def main(
+    ctx: typer.Context,
     require: Annotated[
         list[str] | None,
         typer.Option(
             "--require",
             help="Exit non-zero unless this extra or plugin is fully installed. "
             "Repeatable. Accepts an extra (ingest, video) or a plugin name "
-            "(kb-ingest, kb-video).",
+            "(kb-ingest, kb-video, kb-query).",
         ),
     ] = None,
     json_output: Annotated[  # noqa: FBT002
@@ -118,17 +135,29 @@ def main(
     ``--require``, only a broken core install fails: extras are opt-in, so
     their absence is reported without being treated as an error.
 
+    Args:
+        ctx: The typer context, used to step aside when a subcommand runs.
+        require: Extras or plugins that must be fully installed.
+        json_output: Emit the report as JSON.
+
     Raises:
         typer.BadParameter: If ``--require`` names an unknown extra or plugin.
         typer.Exit: With code 1 when a required component is missing.
 
     """
-    wanted = [PLUGIN_EXTRAS.get(name, name) for name in require or []]
-    for extra in wanted:
+    if ctx.invoked_subcommand is not None:
+        return
+    wanted: list[str] = []
+    for name in require or []:
+        extra = PLUGIN_EXTRAS.get(name, name)
+        if extra is None:
+            # A core-only plugin is satisfied by the core check below.
+            continue
         if extra not in extras.EXTRA_MODULES:
             known = ", ".join([*extras.EXTRA_MODULES, *PLUGIN_EXTRAS])
             msg = f"unknown extra or plugin {extra!r}; expected one of: {known}"
             raise typer.BadParameter(msg)
+        wanted.append(extra)
 
     core = _core_state()
     states = {extra: _extra_state(extra) for extra in extras.EXTRA_MODULES}
@@ -178,3 +207,87 @@ def _print_report(core: CoreState, states: dict[str, ExtraState]) -> None:
             typer.echo(f"    {state.install}")
         for binary in state.missing_binaries:
             typer.echo(f"    {extras.EXTRA_BINARIES[name][binary]}")
+
+
+def _bundle_state(bundle: config.Bundle) -> BundleState:
+    """Describe one resolved bundle.
+
+    Args:
+        bundle: The bundle to describe.
+
+    Returns:
+        Its name, root, source, whether ``okf.toml`` is present, and how many
+        articles its wiki holds.
+
+    """
+    root = bundle.config.root
+    wiki = bundle.config.wiki
+    articles = (
+        sum(1 for p in wiki.rglob("*.md") if is_article(p)) if wiki.is_dir() else 0
+    )
+    return BundleState(
+        name=bundle.name,
+        path=str(root),
+        source=bundle.source,
+        ok=(root / config.CONFIG_FILENAME).is_file(),
+        articles=articles,
+    )
+
+
+@app.command()
+def bundles(
+    kb: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--kb",
+            help="Knowledge base to resolve: a name, a path, or 'all'. Repeatable.",
+        ),
+    ] = None,
+    json_output: Annotated[  # noqa: FBT002
+        bool,
+        typer.Option("--json-output", help="Emit the listing as JSON."),
+    ] = False,
+) -> None:
+    """List the knowledge bases in scope from the working directory.
+
+    Having none in scope is a state, not a failure: this exits 0 with an empty
+    list and says where it looked, so a skill can carry on without a wiki.
+
+    Args:
+        kb: Explicit bundles to resolve instead of the default scope.
+        json_output: Emit the listing as JSON.
+
+    Raises:
+        typer.Exit: With code 1 when the configuration is malformed or names a
+            directory that is not a bundle.
+
+    """
+    try:
+        states = [_bundle_state(b) for b in config.resolve_roots(kb)]
+        searched: tuple[str, ...] = ()
+    except config.ScopeError as exc:
+        states, searched = [], exc.searched
+    except config.ConfigError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
+    if json_output:
+        payload: dict[str, object] = {"bundles": [asdict(s) for s in states]}
+        if searched:
+            payload["searched"] = list(searched)
+        typer.echo(json.dumps(payload, indent=2))
+        return
+
+    if not states:
+        typer.echo("No knowledge base in scope. Searched:")
+        for line in searched:
+            typer.echo(f"  - {line}")
+        return
+
+    width = max(len(s.name) for s in states)
+    for state in states:
+        mark = "✓" if state.ok else "✗"
+        typer.echo(
+            f"{mark} {state.name:<{width}}  {state.path}  "
+            f"({state.source}, {state.articles} articles)",
+        )
