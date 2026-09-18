@@ -5,6 +5,10 @@ style YAML tag lists that the old `tags:` regex could not see, the two shapes
 the `sources` key now takes, deprecation filtering, broken-link detection that
 never touched the filesystem, article counts inflated by `INDEX.md` and
 `log.md`, and image references rewritten with `Path.relative_to`.
+
+Search across several bundles is pinned down by one property: they form one
+BM25 corpus, so results from different bundles interleave in a single ranking
+and every result says which bundle it came from.
 """
 
 # Test-suite conventions: bare asserts, undocumented helpers, magic numbers.
@@ -14,11 +18,12 @@ never touched the filesystem, article counts inflated by `INDEX.md` and
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from typer.testing import CliRunner
 
-from okf_kb import ingest, okf, provenance, search, stats
+from okf_kb import config, ingest, okf, provenance, search, stats
 
 # --------------------------------------------------------------------------
 # search.py — frontmatter parsing
@@ -79,6 +84,10 @@ def _write_article(wiki: Path, name: str, frontmatter: str, term: str) -> None:
     )
 
 
+def _scope(*wikis: Path) -> tuple[config.Bundle, ...]:
+    return tuple(config.bundle_for_wiki(wiki) for wiki in wikis)
+
+
 #: Query hitting one distinctive term per article in the small test corpora.
 CORPUS_QUERY = "alpha beta gamma"
 
@@ -94,7 +103,7 @@ def test_block_style_tags_are_filterable(tmp_path):
     _write_article(wiki, "other-a.md", "type: concept\ntags: [rope]", "delta")
     _write_article(wiki, "other-b.md", "type: concept\ntags: [rope]", "epsilon")
 
-    results = search.search(CORPUS_QUERY, wiki, top_k=10, filter_tag="cuda")
+    results = search.search(CORPUS_QUERY, _scope(wiki), top_k=10, filter_tag="cuda")
     assert {Path(r["path"]).name for r in results} == {
         "block-a.md",
         "block-b.md",
@@ -186,7 +195,10 @@ def test_deprecated_articles_excluded_by_default(tmp_path):
     wiki = tmp_path / "wiki"
     _write_status_wiki(wiki)
 
-    names = {Path(r["path"]).name for r in search.search(CORPUS_QUERY, wiki, top_k=10)}
+    names = {
+        Path(r["path"]).name
+        for r in search.search(CORPUS_QUERY, _scope(wiki), top_k=10)
+    }
     assert names == {"stable.md", "explicit.md"}
 
 
@@ -196,7 +208,12 @@ def test_deprecated_articles_returned_when_requested(tmp_path):
 
     names = {
         Path(r["path"]).name
-        for r in search.search(CORPUS_QUERY, wiki, top_k=10, include_deprecated=True)
+        for r in search.search(
+            CORPUS_QUERY,
+            _scope(wiki),
+            top_k=10,
+            include_deprecated=True,
+        )
     }
     assert names == {"stable.md", "explicit.md", "old.md"}
 
@@ -207,9 +224,125 @@ def test_absent_status_defaults_to_stable(tmp_path):
 
     statuses = {
         Path(r["path"]).name: r["status"]
-        for r in search.search(CORPUS_QUERY, wiki, top_k=10)
+        for r in search.search(CORPUS_QUERY, _scope(wiki), top_k=10)
     }
     assert statuses["stable.md"] == "stable"
+
+
+# --------------------------------------------------------------------------
+# search.py — several bundles in scope
+# --------------------------------------------------------------------------
+
+#: The result keys kb-search emitted before multi-bundle search.
+LEGACY_RESULT_KEYS = {
+    "path",
+    "score",
+    "snippet",
+    "tags",
+    "type",
+    "date_added",
+    "sources",
+    "status",
+}
+
+
+def _two_bundles(tmp_path: Path) -> tuple[Path, Path]:
+    work = tmp_path / "work" / "wiki"
+    client = tmp_path / "client" / "wiki"
+    _write_article(work, "a.md", "type: concept\ntitle: 🧪 Alpha Notes", "alpha")
+    _write_article(work, "filler-w.md", "type: concept", "delta")
+    _write_article(work, "filler-x.md", "type: concept", "epsilon")
+    _write_article(client, "b.md", "type: concept\ndescription: About beta.", "beta")
+    _write_article(client, "filler-y.md", "type: concept", "zeta")
+    _write_article(client, "filler-z.md", "type: concept", "eta")
+    return work, client
+
+
+def test_single_bundle_results_only_gain_the_new_fields(tmp_path):
+    wiki = tmp_path / "wiki"
+    _write_status_wiki(wiki)
+    (result, *_) = search.search(CORPUS_QUERY, _scope(wiki), top_k=10)
+    assert set(result) == LEGACY_RESULT_KEYS | {"bundle", "rel", "title", "description"}
+
+
+def test_two_bundles_rank_as_one_corpus(tmp_path):
+    work, client = _two_bundles(tmp_path)
+    results = search.search("alpha beta", _scope(work, client), top_k=10)
+    assert {(r["bundle"], r["rel"]) for r in results} == {
+        ("work", "a.md"),
+        ("client", "b.md"),
+    }
+
+
+def test_idf_is_computed_across_bundles(tmp_path):
+    """A term common in one bundle but rarer overall scores higher jointly.
+
+    Separate indexes merged afterwards would give the same score either way.
+    """
+    work, client = _two_bundles(tmp_path)
+    for n in range(3):
+        _write_article(client, f"more-beta-{n}.md", "type: concept", "beta")
+    alone = search.search("beta", _scope(client), top_k=1)
+    joint = search.search("beta", _scope(work, client), top_k=1)
+    assert joint[0]["score"] > alone[0]["score"]
+
+
+def test_results_carry_title_and_description(tmp_path):
+    work, client = _two_bundles(tmp_path)
+    by_rel = {
+        r["rel"]: r for r in search.search("alpha beta", _scope(work, client), top_k=10)
+    }
+    assert by_rel["a.md"]["title"] == "Alpha Notes"
+    assert by_rel["a.md"]["description"] is None
+    assert by_rel["b.md"]["title"] == "b"
+    assert by_rel["b.md"]["description"] == "About beta."
+
+
+def test_title_field_ignores_the_body(tmp_path):
+    work, client = _two_bundles(tmp_path)
+    scope = _scope(work, client)
+    assert search.search("alpha", scope, fields=search.Field.TITLE)
+    assert search.search("discussion", scope, fields=search.Field.TITLE) == []
+
+
+def test_cli_kb_and_wiki_dir_are_exclusive(tmp_path):
+    wiki = tmp_path / "wiki"
+    _write_status_wiki(wiki)
+    result = CliRunner().invoke(
+        search.app,
+        ["alpha", "--wiki-dir", str(wiki), "--kb", "all"],
+    )
+    assert result.exit_code != 0
+    assert "mutually exclusive" in result.output
+
+
+def test_cli_resolves_bundles_from_a_project_file(tmp_path, monkeypatch):
+    work, client = _two_bundles(tmp_path)
+    for wiki in (work, client):
+        (wiki.parent / "okf.toml").write_text("", encoding="utf-8")
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / ".okf-kb.toml").write_text(
+        f'[paths]\nwork = "{work.parent}"\nclient = "{client.parent}"\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    monkeypatch.delenv(config.ENV_ROOT, raising=False)
+    monkeypatch.chdir(project)
+
+    result = CliRunner().invoke(search.app, ["alpha beta", "--json-output"])
+
+    assert result.exit_code == 0, result.output
+    assert {r["bundle"] for r in json.loads(result.output)} == {"work", "client"}
+
+
+def test_cli_with_nothing_in_scope_fails_cleanly(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    monkeypatch.delenv(config.ENV_ROOT, raising=False)
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(search.app, ["alpha"])
+    assert result.exit_code == 1
+    assert "no knowledge base in scope" in result.output
 
 
 def test_index_and_log_are_not_articles(tmp_path):
