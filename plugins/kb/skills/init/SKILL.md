@@ -141,7 +141,7 @@ substitute the placeholders:
 | `{{CAPTURE_SKILLS}}` | Rows for `/kb-capture:capture`, `/kb-capture:meeting`, `/kb-capture:update-brief` — only if `kb-capture` is enabled |
 | `{{CAPTURE_TASKS}}` | The Capture and Meeting VS Code tasks — only if `kb-capture` is enabled |
 | `{{FOAM_TASK}}` | The graph-view task — only if the user uses the Foam extension |
-| `{{EXTRA_PLUGINS}}` | One `"<plugin>@okf-kb": true` entry per enabled optional plugin |
+| `{{EXTRA_PLUGINS}}` | One `"<plugin>@okf-kb": true` entry per enabled optional plugin: `kb-ingest`, `kb-video`, `kb-capture`. Never `kb` or `kb-query`, which the template already enables |
 | `{{INSTALL_COMMAND}}` | The install command whose extras match those plugins, from step 1 |
 
 A block for a plugin that is not enabled is replaced with nothing, not left as a
@@ -162,7 +162,8 @@ on.
 ```
 
 Write an entry for every optional plugin enabled in this session, and nothing
-for the ones that are not. The scaffolded `settings.json` is what turns those
+for the ones that are not. `kb` and `kb-query` are written by the template
+itself, so listing either here again produces a duplicate key. The scaffolded `settings.json` is what turns those
 plugins on for anyone who clones the bundle, so a plugin left out here is a
 skill that silently does not exist for them — and one put in without its extra
 installed is a skill that fails the first time they reach for it. Keep this
