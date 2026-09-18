@@ -165,6 +165,7 @@ The skills drive these; you can also run them directly.
 | `kb-health` | Automated health checks; timestamped report to `output/` |
 | `kb-search` | BM25 full-text search with tag and type filters, across one or several bundles |
 | `kb-stats` | Article counts, word counts, link density, orphans |
+| `kb-graph` | Walk the wiki's cross-links: section roots, one article's backlinks, neighbours, shortest path |
 | `kb-provenance` | Map, retract, classify and migrate source provenance |
 | `kb-ingest` | Fetch arXiv papers, extract PDFs, convert HTML, localise images |
 | `kb-export` | Marp slide decks, or the whole wiki flattened to one file |

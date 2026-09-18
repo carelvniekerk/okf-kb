@@ -33,6 +33,7 @@ import typer
 
 from okf_kb import config, frontmatter, links
 from okf_kb.frontmatter import is_article
+from okf_kb.graph import Graph
 
 app = typer.Typer(help="Run automated health checks on the knowledge base wiki.")
 
@@ -410,18 +411,18 @@ def check_stale_sources(wiki_dir: Path) -> list[str]:
 
 
 def check_orphans(wiki_dir: Path) -> list[str]:
-    """Find wiki articles not linked from any other article or INDEX.md."""
-    md_files = sorted(wiki_dir.rglob("*.md"))
-    all_files = {f.resolve() for f in md_files}
-    linked: set[Path] = set()
+    """Find wiki articles not linked from any other markdown file in the wiki.
 
-    for md_file in md_files:
-        text = md_file.read_text(encoding="utf-8")
-        linked.update(links.resolve(target, md_file) for target in links.targets(text))
+    Args:
+        wiki_dir: Path to the wiki directory.
 
-    root = wiki_dir.resolve()
-    orphans = [f for f in all_files if f not in linked and is_article(f)]
-    return [f"Orphan article: `{p.relative_to(root)}`" for p in sorted(orphans)]
+    Returns:
+        One issue string per orphan, in path order.
+
+    """
+    return [
+        f"Orphan article: `{node.rel}`" for node in Graph.from_wiki(wiki_dir).orphans()
+    ]
 
 
 @app.command()

@@ -9,8 +9,8 @@ from typing import Annotated
 
 import typer
 
-from okf_kb import config, links
-from okf_kb.frontmatter import is_article
+from okf_kb import config
+from okf_kb.graph import Graph
 
 app = typer.Typer(help="Print statistics about the knowledge base wiki.")
 
@@ -32,56 +32,25 @@ def compute_stats(wiki_dir: Path) -> dict:
         and the per-article breakdown.
 
     """
-    wiki_root = wiki_dir.resolve()
-    md_files = sorted(wiki_dir.rglob("*.md"))
-    article_paths = {f.resolve() for f in md_files if is_article(f)}
+    graph = Graph.from_wiki(wiki_dir)
+    nodes = [node for node in graph.nodes() if not node.is_index]
 
     articles: list[dict] = []
-    outgoing: dict[Path, int] = {}
     total_words = 0
-    total_links = 0
-    broken_links: list[str] = []
-    incoming_counts: dict[Path, int] = dict.fromkeys(article_paths, 0)
-
-    for md_file in md_files:
-        text = md_file.read_text(encoding="utf-8")
-        rel_path = str(md_file.relative_to(wiki_dir))
-        absolute = md_file.resolve()
-        targets = links.internal_targets(text)
-
-        for target in targets:
-            resolved = links.resolve(target, md_file)
-            if not resolved.exists():
-                broken_links.append(f"{rel_path} -> {target}")
-            if resolved in incoming_counts:
-                incoming_counts[resolved] += 1
-
-        if absolute not in article_paths:
-            continue
-
-        words = len(text.split())
+    for node in nodes:
+        words = len(node.path.read_text(encoding="utf-8").split())
         total_words += words
-        total_links += len(targets)
-        outgoing[absolute] = len(targets)
         articles.append(
             {
-                "path": rel_path,
+                "path": str(node.rel),
                 "words": words,
-                "outgoing_links": len(targets),
+                "outgoing_links": len(node.out),
             },
         )
-
-    orphans = sorted(
-        str(path.relative_to(wiki_root))
-        for path, count in incoming_counts.items()
-        if count == 0
-    )
+    total_links = sum(len(node.out) for node in nodes)
 
     # Most connected articles (by total links in + out)
-    connectivity = {
-        str(path.relative_to(wiki_root)): out + incoming_counts.get(path, 0)
-        for path, out in outgoing.items()
-    }
+    connectivity = {str(node.rel): len(node.out) + len(node.inbound) for node in nodes}
     most_connected = sorted(
         connectivity.items(),
         key=lambda x: x[1],
@@ -94,8 +63,11 @@ def compute_stats(wiki_dir: Path) -> dict:
         "total_internal_links": total_links,
         "avg_words_per_article": round(total_words / max(len(articles), 1)),
         "avg_links_per_article": round(total_links / max(len(articles), 1), 1),
-        "orphan_articles": orphans,
-        "broken_links": broken_links,
+        "orphan_articles": [str(node.rel) for node in graph.orphans()],
+        "broken_links": [
+            f"{source.relative_to(graph.wiki)} -> {raw}"
+            for source, raw in graph.broken()
+        ],
         "most_connected": most_connected,
         "articles": sorted(articles, key=lambda a: a["words"], reverse=True),
     }
