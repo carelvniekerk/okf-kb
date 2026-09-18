@@ -37,6 +37,7 @@ src/okf_kb/            # the Python package — one module per kb-* command
 ├── frontmatter.py     # the ONLY place YAML frontmatter is read or written
 ├── okf.py             # OKF v0.2 schema construction
 ├── links.py           # the ONLY markdown link scanner
+├── graph.py           # kb-graph: the link graph, backlinks, traversal
 ├── gitmeta.py         # git archaeology, for provenance backfill
 ├── extras.py          # optional-dependency handling. See "Extras" below
 ├── doctor.py          # kb-doctor, and kb-doctor bundles
