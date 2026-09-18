@@ -163,7 +163,7 @@ The skills drive these; you can also run them directly.
 |---|---|
 | `kb-index` | Regenerate every `INDEX.md` from article frontmatter |
 | `kb-health` | Automated health checks; timestamped report to `output/` |
-| `kb-search` | BM25 full-text search with tag and type filters |
+| `kb-search` | BM25 full-text search with tag and type filters, across one or several bundles |
 | `kb-stats` | Article counts, word counts, link density, orphans |
 | `kb-provenance` | Map, retract, classify and migrate source provenance |
 | `kb-ingest` | Fetch arXiv papers, extract PDFs, convert HTML, localise images |
@@ -173,7 +173,58 @@ The skills drive these; you can also run them directly.
 
 Every command finds its bundle by walking up from the working directory looking
 for `okf.toml`, the way `git` finds `.git`. They run from anywhere inside a
-knowledge base, not only from its root.
+knowledge base, not only from its root. The read-only commands can also reach a
+knowledge base from outside it; see the next section.
+
+## Using a knowledge base from another project
+
+When you work in a code project, the agent there cannot see your wiki unless
+something tells it where the wiki is. Two files do that. The user config holds
+the paths on this machine:
+
+```toml
+# ~/.config/okf-kb/config.toml   (honours XDG_CONFIG_HOME)
+default = "work"
+
+[bundles]
+research    = "~/kb"
+work        = "~/multiplai/kb"
+bergfreunde = "~/clients/bergfreunde/kb"
+```
+
+A project names the knowledge bases it consumes in a committed
+`.okf-kb.toml`, so the choice travels with the repository while the paths stay
+per machine:
+
+```toml
+# .okf-kb.toml, at the project root
+bundles = ["work", "bergfreunde"]
+default = "bergfreunde"            # optional; without it, every listed bundle is in scope
+
+[paths]                            # optional, for a checkout with no user config
+bergfreunde = "../bergfreunde-kb"  # relative to this file; ~ expands
+```
+
+An entry in the project's `[paths]` shadows the user config entry of the same
+name. The file is deliberately not called `okf.toml`, because that name tells
+every writing tool the directory *is* a knowledge base.
+
+The read-only commands resolve their scope in this order, stopping at the first
+that yields anything:
+
+1. `--kb`, repeatable, taking a bundle name, a path, or `all`;
+2. the `OKF_KB_ROOT` environment variable;
+3. an enclosing `okf.toml`, when you are standing inside a bundle;
+4. an enclosing `.okf-kb.toml`: its `default`, or every bundle it lists;
+5. the user config's `default`.
+
+Check what is in scope with `kb-doctor bundles`. A name that points at a
+directory holding no `okf.toml` is an error naming the file that declared it,
+never a silently empty result.
+
+Only reading goes through this. `kb-index`, `kb-health`, `kb-provenance` and
+the ingest tools still find their bundle by walking up, so nothing can compile
+or reindex a knowledge base you are not standing in.
 
 ## okf.toml
 
