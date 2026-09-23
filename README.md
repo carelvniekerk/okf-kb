@@ -134,6 +134,44 @@ Adding an extra later means reinstalling, and `uv tool install --force`
 keep, not just the new one. `kb-doctor`, and the errors the tools raise, always
 compose it that way. Paste what they give you rather than writing your own.
 
+## Claude desktop app
+
+Desktop chat runs skills in a cloud sandbox that has neither the `kb-*` tools
+nor your bundles, so the `wiki` skill reaches them through `kb-mcp`, the same
+MCP server the `kb-query` plugin starts in Claude Code.
+
+1. Install the tools as in [Getting started](#getting-started), and give the
+   user config a `default` bundle (see
+   [Using a knowledge base from another project](#using-a-knowledge-base-from-another-project)).
+   The desktop app starts the server outside any project, so that default is
+   the only scope it sees. Check it with `cd ~ && kb-doctor bundles`.
+2. Add the server to
+   `~/Library/Application Support/Claude/claude_desktop_config.json`. The app
+   does not see your shell's `PATH`, so use the absolute path that
+   `which kb-mcp` prints:
+
+   ```json
+   {
+       "mcpServers": {
+           "okf-kb": {
+               "command": "/Users/you/.local/bin/kb-mcp"
+           }
+       }
+   }
+   ```
+
+3. Restart the app. The `okf-kb` tools appear under the connectors menu.
+4. From a clone of this repository, zip the skill and upload `wiki.zip` under
+   Settings > Capabilities > Skills:
+
+   ```bash
+   cd plugins/kb-query/skills && zip -r wiki.zip wiki
+   ```
+
+The server's own instructions already tell the model to check the wiki first,
+so step 4 is optional; the skill makes the procedure stricter. An uploaded
+skill is a copy, so re-upload it when `SKILL.md` changes.
+
 ## Plugins
 
 | Plugin | Skills | Needs |
@@ -248,39 +286,6 @@ In the consuming project's `.claude/settings.json`:
     }
 }
 ```
-
-### From the Claude desktop app
-
-Desktop chat runs skills in a cloud sandbox that has neither the `kb-*` tools
-nor your bundles, so the `wiki` skill reaches them through the same `kb-mcp`
-server Claude Code uses. There is no working directory inside a bundle there,
-so scope comes from the user config's `default` alone; check it with
-`kb-doctor bundles` from your home directory.
-
-Register the server in `~/Library/Application Support/Claude/claude_desktop_config.json`.
-The desktop app does not see your shell's `PATH`, so give the absolute path
-that `which kb-mcp` prints:
-
-```json
-{
-    "mcpServers": {
-        "okf-kb": {
-            "command": "/Users/you/.local/bin/kb-mcp"
-        }
-    }
-}
-```
-
-Restart the app, then upload the skill under Settings > Capabilities as a zip
-of its directory:
-
-```bash
-cd plugins/kb-query/skills && zip -r wiki.zip wiki
-```
-
-The server's own instructions tell the model to check the wiki first, so the
-tools work without the skill; the skill makes the procedure stricter. An
-uploaded skill is a copy: re-upload it when `SKILL.md` changes.
 
 ## okf.toml
 
