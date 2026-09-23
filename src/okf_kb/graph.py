@@ -601,6 +601,139 @@ def _make_node(
     )
 
 
+# -- JSON payloads, shared by the CLI and the MCP server --------------------------
+
+
+def node_json(graph: Graph, node: Node) -> dict[str, Any]:
+    """Serialise a node with wiki-relative paths and no repeated links.
+
+    Args:
+        graph: The node's graph, for path display.
+        node: The node.
+
+    Returns:
+        A JSON-ready mapping.
+
+    """
+    return {
+        "bundle": node.bundle,
+        "path": str(node.path),
+        "rel": node.rel.as_posix(),
+        "title": node.title,
+        "type": node.type,
+        "description": node.description,
+        "tags": list(node.tags),
+        "status": node.status,
+        "tier": node.tier,
+        "out": [graph.display(p) for p in dict.fromkeys(node.out)],
+        "inbound": [graph.display(p) for p in dict.fromkeys(node.inbound)],
+        "indexes": [graph.display(p) for p in node.indexes],
+    }
+
+
+def roots_payload(graphs: Sequence[Graph]) -> list[dict[str, Any]]:
+    """List each bundle's root index sections and the files under them.
+
+    Args:
+        graphs: The graphs in scope.
+
+    Returns:
+        One ``{"bundle", "sections"}`` mapping per graph.
+
+    """
+    return [
+        {
+            "bundle": g.bundle,
+            "sections": [
+                {
+                    "title": s.title,
+                    "level": s.level,
+                    "entries": [g.display(p) for p in s.entries],
+                }
+                for s in g.roots()
+            ],
+        }
+        for g in graphs
+    ]
+
+
+def neighbours_payload(
+    graphs: Sequence[Graph],
+    paths: Sequence[str],
+    depth: int,
+) -> list[dict[str, Any]]:
+    """Find the nodes within ``depth`` links of several starting nodes.
+
+    Args:
+        graphs: The graphs in scope.
+        paths: The starting nodes, which may lie in different bundles.
+        depth: Maximum number of hops, at least 1.
+
+    Returns:
+        One :func:`node_json` mapping plus ``distance`` per node reached,
+        nearest first, keeping each node's smallest distance from any start
+        and excluding the starts themselves.
+
+    Raises:
+        GraphError: If a path is not a node in scope, or ``depth`` is below 1.
+
+    """
+    best: dict[Path, tuple[Graph, Node, int]] = {}
+    starts: set[Path] = set()
+    for path in paths:
+        graph, start = locate(graphs, path)
+        starts.add(start.path)
+        for found, distance in graph.neighbours(start.path, depth):
+            current = best.get(found.path)
+            if current is None or distance < current[2]:
+                best[found.path] = (graph, found, distance)
+    ordered = sorted(
+        (entry for key, entry in best.items() if key not in starts),
+        key=lambda e: (e[2], e[1].bundle, e[1].rel),
+    )
+    return [{**node_json(g, n), "distance": d} for g, n, d in ordered]
+
+
+def shortest_path_payload(
+    graphs: Sequence[Graph],
+    a: str,
+    b: str,
+) -> dict[str, Any]:
+    """Find a shortest chain of links between two articles of one bundle.
+
+    Args:
+        graphs: The graphs in scope.
+        a: One end.
+        b: The other end.
+
+    Returns:
+        ``bundle``, ``path`` (the wiki-relative chain, ``a`` first) and
+        ``hops`` (``forward``, ``backward`` or ``both`` per link). ``path``
+        and ``hops`` are ``None`` when the two are not connected.
+
+    Raises:
+        GraphError: If an end is not a node in scope, or the two ends are in
+            different bundles.
+
+    """
+    graph_a, node_a = locate(graphs, a)
+    graph_b, node_b = locate(graphs, b)
+    if graph_a is not graph_b:
+        msg = (
+            f"different bundles: {a} is in {graph_a.bundle}, "
+            f"{b} is in {graph_b.bundle}; links never cross bundles"
+        )
+        raise GraphError(msg)
+    chain = graph_a.shortest_path(node_a.path, node_b.path)
+    if chain is None:
+        return {"bundle": graph_a.bundle, "path": None, "hops": None}
+    return {
+        "bundle": graph_a.bundle,
+        "path": [n.rel.as_posix() for n in chain],
+        "hops": [graph_a.direction(x.path, y.path) for x, y in pairwise(chain)],
+    }
+
+
 # -- CLI -----------------------------------------------------------------------
 
 #: How ``shortest-path`` draws each hop.
@@ -653,33 +786,6 @@ def _fail(exc: GraphError) -> typer.Exit:
     return typer.Exit(1)
 
 
-def _node_json(graph: Graph, node: Node) -> dict[str, Any]:
-    """Serialise a node with wiki-relative paths and no repeated links.
-
-    Args:
-        graph: The node's graph, for path display.
-        node: The node.
-
-    Returns:
-        A JSON-ready mapping.
-
-    """
-    return {
-        "bundle": node.bundle,
-        "path": str(node.path),
-        "rel": node.rel.as_posix(),
-        "title": node.title,
-        "type": node.type,
-        "description": node.description,
-        "tags": list(node.tags),
-        "status": node.status,
-        "tier": node.tier,
-        "out": [graph.display(p) for p in dict.fromkeys(node.out)],
-        "inbound": [graph.display(p) for p in dict.fromkeys(node.inbound)],
-        "indexes": [graph.display(p) for p in node.indexes],
-    }
-
-
 def _emit(payload: object) -> None:
     """Print a payload as indented JSON.
 
@@ -697,22 +803,7 @@ def roots(kb: KbOption = None, json_output: JsonOption = False) -> None:  # noqa
     """List each bundle's root index sections and the files under them."""
     graphs = _graphs(kb)
     if json_output:
-        _emit(
-            [
-                {
-                    "bundle": g.bundle,
-                    "sections": [
-                        {
-                            "title": s.title,
-                            "level": s.level,
-                            "entries": [g.display(p) for p in s.entries],
-                        }
-                        for s in g.roots()
-                    ],
-                }
-                for g in graphs
-            ],
-        )
+        _emit(roots_payload(graphs))
         return
     for graph in graphs:
         typer.echo(f"{graph.bundle}  {graph.wiki}")
@@ -742,7 +833,7 @@ def node(
         graph, found = locate(_graphs(kb), path)
     except GraphError as exc:
         raise _fail(exc) from exc
-    data = _node_json(graph, found)
+    data = node_json(graph, found)
     if json_output:
         _emit(data)
         return
@@ -774,30 +865,17 @@ def neighbours(
         Exit: With status 1 when a path is not a node in scope.
 
     """
-    graphs = _graphs(kb)
-    best: dict[Path, tuple[Graph, Node, int]] = {}
-    starts: set[Path] = set()
     try:
-        for path in paths:
-            graph, start = locate(graphs, path)
-            starts.add(start.path)
-            for found, distance in graph.neighbours(start.path, depth):
-                current = best.get(found.path)
-                if current is None or distance < current[2]:
-                    best[found.path] = (graph, found, distance)
+        found = neighbours_payload(_graphs(kb), paths, depth)
     except GraphError as exc:
         raise _fail(exc) from exc
-
-    ordered = sorted(
-        (entry for key, entry in best.items() if key not in starts),
-        key=lambda e: (e[2], e[1].bundle, e[1].rel),
-    )
     if json_output:
-        _emit([{**_node_json(g, n), "distance": d} for g, n, d in ordered])
+        _emit(found)
         return
-    for _, found, distance in ordered:
+    for entry in found:
         typer.echo(
-            f"{distance}  [{found.bundle}] {found.rel.as_posix()}  {found.title}",
+            f"{entry['distance']}  [{entry['bundle']}] {entry['rel']}  "
+            f"{entry['title']}",
         )
 
 
@@ -819,32 +897,16 @@ def shortest_path(
             are in different bundles.
 
     """
-    graphs = _graphs(kb)
     try:
-        graph_a, node_a = locate(graphs, a)
-        graph_b, node_b = locate(graphs, b)
+        result = shortest_path_payload(_graphs(kb), a, b)
     except GraphError as exc:
         raise _fail(exc) from exc
-    if graph_a is not graph_b:
-        typer.echo(
-            f"error: different bundles: {a} is in {graph_a.bundle}, "
-            f"{b} is in {graph_b.bundle}; links never cross bundles",
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    chain = graph_a.shortest_path(node_a.path, node_b.path)
-    if chain is None:
-        if json_output:
-            _emit({"bundle": graph_a.bundle, "path": None, "hops": None})
-        else:
-            typer.echo(f"no path between {a} and {b}")
-        return
-
-    rels = [n.rel.as_posix() for n in chain]
-    hops = [graph_a.direction(x.path, y.path) for x, y in pairwise(chain)]
     if json_output:
-        _emit({"bundle": graph_a.bundle, "path": rels, "hops": hops})
+        _emit(result)
+        return
+    rels, hops = result["path"], result["hops"]
+    if rels is None:
+        typer.echo(f"no path between {a} and {b}")
         return
     line = rels[0]
     for rel, hop in zip(rels[1:], hops, strict=True):

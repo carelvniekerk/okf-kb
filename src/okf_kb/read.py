@@ -143,6 +143,37 @@ def _strip(text: str) -> str:
     return body.lstrip("\n")
 
 
+def read_article(
+    path: str,
+    bundles: Sequence[config.Bundle],
+    heading: str | None = None,
+    strip_frontmatter: bool = False,  # noqa: FBT001, FBT002
+) -> tuple[config.Bundle, str, str]:
+    """Read one wiki article, or one section of it, from the bundles in scope.
+
+    Args:
+        path: An absolute, bundle-root-relative or wiki-relative path.
+        bundles: The bundles in scope.
+        heading: If set, return only this section; see :func:`section`.
+        strip_frontmatter: Drop the YAML frontmatter block.
+
+    Returns:
+        The bundle, the article's wiki-relative POSIX path, and its text.
+
+    Raises:
+        ReadError: If the path is refused, or the section does not exist.
+
+    """
+    bundle, resolved = resolve_readable(path, bundles)
+    text = resolved.read_text(encoding="utf-8")
+    if strip_frontmatter:
+        text = _strip(text)
+    if heading is not None:
+        text = section(text, heading)
+    rel = resolved.relative_to(bundle.config.wiki.resolve()).as_posix()
+    return bundle, rel, text
+
+
 @app.command()
 def main(
     path: Annotated[
@@ -178,17 +209,16 @@ def main(
 
     """
     try:
-        bundle, resolved = resolve_readable(path, config.resolve_roots(kb))
-        text = resolved.read_text(encoding="utf-8")
-        if strip_frontmatter:
-            text = _strip(text)
-        if heading is not None:
-            text = section(text, heading)
+        bundle, rel, text = read_article(
+            path,
+            config.resolve_roots(kb),
+            heading,
+            strip_frontmatter,
+        )
     except (config.ConfigError, ReadError) as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(1) from exc
 
-    rel = resolved.relative_to(bundle.config.wiki.resolve()).as_posix()
     typer.echo(f"==> {bundle.name}: {rel} <==")
     typer.echo(text.rstrip("\n"))
 
