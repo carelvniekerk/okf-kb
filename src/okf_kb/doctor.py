@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import shutil
 from dataclasses import asdict, dataclass, field
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 
@@ -236,6 +236,28 @@ def _bundle_state(bundle: config.Bundle) -> BundleState:
     )
 
 
+def scope_report(kb: list[str] | None = None) -> dict[str, Any]:
+    """Describe the bundles in scope, treating an empty scope as a state.
+
+    Args:
+        kb: Explicit bundles to resolve instead of the default scope.
+
+    Returns:
+        ``bundles``, one :class:`BundleState` mapping per bundle, and, when
+        none is in scope, ``searched``: one line per place consulted.
+
+    Raises:
+        ConfigError: If the configuration is malformed or names a directory
+            that is not a bundle.
+
+    """
+    try:
+        states = [_bundle_state(b) for b in config.resolve_roots(kb)]
+    except config.ScopeError as exc:
+        return {"bundles": [], "searched": list(exc.searched)}
+    return {"bundles": [asdict(s) for s in states]}
+
+
 @app.command()
 def bundles(
     kb: Annotated[
@@ -265,31 +287,26 @@ def bundles(
 
     """
     try:
-        states = [_bundle_state(b) for b in config.resolve_roots(kb)]
-        searched: tuple[str, ...] = ()
-    except config.ScopeError as exc:
-        states, searched = [], exc.searched
+        payload = scope_report(kb)
     except config.ConfigError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(1) from exc
 
     if json_output:
-        payload: dict[str, object] = {"bundles": [asdict(s) for s in states]}
-        if searched:
-            payload["searched"] = list(searched)
         typer.echo(json.dumps(payload, indent=2))
         return
 
+    states = payload["bundles"]
     if not states:
         typer.echo("No knowledge base in scope. Searched:")
-        for line in searched:
+        for line in payload["searched"]:
             typer.echo(f"  - {line}")
         return
 
-    width = max(len(s.name) for s in states)
+    width = max(len(s["name"]) for s in states)
     for state in states:
-        mark = "✓" if state.ok else "✗"
+        mark = "✓" if state["ok"] else "✗"
         typer.echo(
-            f"{mark} {state.name:<{width}}  {state.path}  "
-            f"({state.source}, {state.articles} articles)",
+            f"{mark} {state['name']:<{width}}  {state['path']}  "
+            f"({state['source']}, {state['articles']} articles)",
         )
