@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "okf-kb": {
+      "type": "stdio",
+      "command": "kb-mcp"
+    }
+  }
+}
