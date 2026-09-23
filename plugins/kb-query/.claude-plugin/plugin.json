@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "kb-query",
-  "description": "Read-only access to Open Knowledge Format knowledge bases from any project. One skill, wiki, searches the knowledge bases in scope, follows their cross-links and backlinks, and reads the articles it needs, so an agent checks what you have already written down before answering from training data. Scope comes from okf.toml when you are inside a bundle, or from a project's .okf-kb.toml and ~/.config/okf-kb/config.toml when you are not. Nothing in this plugin can write to a knowledge base. Requires the okf-kb Python package for the kb-* tools.",
+  "description": "Read-only access to Open Knowledge Format knowledge bases from any project. One skill, wiki, searches the knowledge bases in scope, follows their cross-links and backlinks, and reads the articles it needs, so an agent checks what you have already written down before answering from training data. Scope comes from okf.toml when you are inside a bundle, or from a project's .okf-kb.toml and ~/.config/okf-kb/config.toml when you are not. Nothing in this plugin can write to a knowledge base. Its tools come from the okf-kb MCP server (kb-mcp), which the plugin starts and the Claude desktop app can register too. Requires the okf-kb Python package.",
   "author": {
     "name": "Carel van Niekerk",
     "email": "code@carelvanniekerk.com",

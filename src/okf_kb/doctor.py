@@ -35,6 +35,7 @@ CORE_COMMANDS = (
     "kb-export",
     "kb-graph",
     "kb-read",
+    "kb-mcp",
 )
 
 #: Which extra each plugin's skills depend on. The plugin names are the ones

@@ -4,7 +4,13 @@ version = "0.1.0"
 description = "Tooling for agent-maintained Open Knowledge Format knowledge bases"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = ["pyyaml>=6.0.3", "rank-bm25>=0.2", "rich>=13.0", "typer>=0.12"]
+dependencies = [
+    "mcp>=2.2",
+    "pyyaml>=6.0.3",
+    "rank-bm25>=0.2",
+    "rich>=13.0",
+    "typer>=0.12",
+]
 
 # Heavy, platform-sensitive dependencies are opt-in. Every module that needs one
 # imports it inside the function that uses it, so a core-only install imports and
@@ -28,6 +34,7 @@ kb-health = "okf_kb.health:app"
 kb-doctor = "okf_kb.doctor:app"
 kb-graph = "okf_kb.graph:app"
 kb-read = "okf_kb.read:app"
+kb-mcp = "okf_kb.mcp_server:main"
 kb-index = "okf_kb.index_gen:app"
 kb-provenance = "okf_kb.provenance:app"
 kb-video = "okf_kb.video:main"

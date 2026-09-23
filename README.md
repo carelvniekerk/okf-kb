@@ -139,7 +139,7 @@ compose it that way. Paste what they give you rather than writing your own.
 | Plugin | Skills | Needs |
 |---|---|---|
 | `kb` | `init`, `adopt`, `compile`, `health`, `verify` | core install |
-| `kb-query` | `wiki` | core install; read-only |
+| `kb-query` | `wiki` | core install; read-only; ships the `okf-kb` MCP server |
 | `kb-ingest` | `ingest`, `transcribe` | `[ingest]` extra |
 | `kb-video` | `video` | `[video]` extra + `ffmpeg` |
 | `kb-capture` | `capture`, `meeting`, `update-brief` | core install + calendar/mail connectors; ships the Granola MCP |
@@ -175,6 +175,7 @@ The skills drive these; you can also run them directly.
 | `kb-ingest` | Fetch arXiv papers, extract PDFs, convert HTML, localise images |
 | `kb-export` | Marp slide decks, or the whole wiki flattened to one file |
 | `kb-video` | Stage a YouTube video's captions, audio and frames |
+| `kb-mcp` | The read-only wiki tools as a stdio MCP server, for the `wiki` skill and the Claude desktop app |
 | `kb-doctor` | Report which extras are installed, and what to run to add the rest; `kb-doctor bundles` lists the knowledge bases in scope |
 
 Every command finds its bundle by walking up from the working directory looking
@@ -232,9 +233,10 @@ Only reading goes through this. `kb-index`, `kb-health`, `kb-provenance` and
 the ingest tools still find their bundle by walking up, so nothing can compile
 or reindex a knowledge base you are not standing in.
 
-The `kb-query` plugin's `wiki` skill drives all of this. Its `kb-*` commands
-run under the skill's own permissions, so the only grant a consuming project
-needs is the skill itself. Without it, Claude Code asks once per session, and a
+The `kb-query` plugin's `wiki` skill drives all of this. It calls the tools of
+the `okf-kb` MCP server (`kb-mcp`), which the plugin starts for you, and those
+tools run under the skill's own permissions, so the only grant a consuming
+project needs is the skill itself. Without it, Claude Code asks once per session, and a
 headless `claude -p` run is refused outright:
 
 In the consuming project's `.claude/settings.json`:
@@ -246,6 +248,39 @@ In the consuming project's `.claude/settings.json`:
     }
 }
 ```
+
+### From the Claude desktop app
+
+Desktop chat runs skills in a cloud sandbox that has neither the `kb-*` tools
+nor your bundles, so the `wiki` skill reaches them through the same `kb-mcp`
+server Claude Code uses. There is no working directory inside a bundle there,
+so scope comes from the user config's `default` alone; check it with
+`kb-doctor bundles` from your home directory.
+
+Register the server in `~/Library/Application Support/Claude/claude_desktop_config.json`.
+The desktop app does not see your shell's `PATH`, so give the absolute path
+that `which kb-mcp` prints:
+
+```json
+{
+    "mcpServers": {
+        "okf-kb": {
+            "command": "/Users/you/.local/bin/kb-mcp"
+        }
+    }
+}
+```
+
+Restart the app, then upload the skill under Settings > Capabilities as a zip
+of its directory:
+
+```bash
+cd plugins/kb-query/skills && zip -r wiki.zip wiki
+```
+
+The server's own instructions tell the model to check the wiki first, so the
+tools work without the skill; the skill makes the procedure stricter. An
+uploaded skill is a copy: re-upload it when `SKILL.md` changes.
 
 ## okf.toml
 

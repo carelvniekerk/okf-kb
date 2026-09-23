@@ -39,6 +39,7 @@ src/okf_kb/            # the Python package — one module per kb-* command
 ├── links.py           # the ONLY markdown link scanner
 ├── graph.py           # kb-graph: the link graph, backlinks, traversal
 ├── read.py            # kb-read: print one article from any bundle in scope
+├── mcp_server.py      # kb-mcp: search, graph and read as MCP tools
 ├── gitmeta.py         # git archaeology, for provenance backfill
 ├── extras.py          # optional-dependency handling. See "Extras" below
 ├── doctor.py          # kb-doctor, and kb-doctor bundles
@@ -58,7 +59,7 @@ src/okf_kb/            # the Python package — one module per kb-* command
 plugins/               # the Claude Code marketplace — one directory per plugin
 ├── kb/                # init, adopt, compile, health, verify
 │   └── skills/init/templates/   # what /kb:init scaffolds INTO a bundle
-├── kb-query/          # wiki (read-only: search, graph, read)
+├── kb-query/          # wiki (read-only), via the kb-mcp server in .mcp.json
 ├── kb-ingest/         # ingest, transcribe            needs [ingest]
 ├── kb-video/          # video                         needs [video] + ffmpeg
 └── kb-capture/        # capture, meeting, update-brief
@@ -184,7 +185,16 @@ which can reach a bundle the user is not standing in. Every command that writes
 (`kb-index`, `kb-health`, `kb-provenance`, `kb-ingest`, `kb-video`,
 `kb-export`) keeps walk-up discovery through `config.load()`, so nothing can
 compile, reindex or report into a bundle from outside it. Do not add `--kb` to
-a writing command.
+a writing command, and do not add a writing tool to `mcp_server.py`, which
+takes `kb` on every tool.
+
+**`kb-mcp` wraps the CLI's functions, never its processes.** Each tool calls
+the payload function its command calls (`graph.neighbours_payload`,
+`read.read_article`, `doctor.scope_report`), so the JSON an agent gets is the
+same on both paths. A new read-only command that the `wiki` skill should use
+needs a tool here, a line in the skill's `allowed-tools` under the
+`mcp__plugin_kb-query_okf-kb__` prefix Claude Code derives, and a mention in
+the skill body; `tests/test_mcp_server.py` fails until all three agree.
 
 **Only `config.resolve_roots` reads the pointer files.** The user config
 (`$XDG_CONFIG_HOME/okf-kb/config.toml`) and a project's `.okf-kb.toml` are read
