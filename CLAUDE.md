@@ -58,6 +58,7 @@ src/okf_kb/            # the Python package — one module per kb-* command
 
 plugins/               # the Claude Code marketplace — one directory per plugin
 ├── kb/                # init, adopt, compile, health, verify
+│   ├── hooks/         # guard-human-signoff: asks before any new human: sign-off
 │   ├── references/    # house-style.md, tooling.md: read via ${CLAUDE_PLUGIN_ROOT}
 │   └── skills/init/templates/   # what /kb:init scaffolds INTO a bundle
 ├── kb-query/          # wiki (read-only), via the kb-mcp server in .mcp.json
@@ -266,6 +267,12 @@ subcommands a skill uses, never `Bash(git *)`, which pre-approves `push` and
 because a live meeting note stays uncommitted by design. Every skill except
 `/kb-query:wiki` sets `disable-model-invocation: true`, since each writes files
 or commits.
+
+**A rule that must hold every time goes in a hook or in code, not only in a
+skill.** The `kb` plugin's `hooks/guard-human-signoff.py` returns `ask` on any
+Edit or Write that adds a `human:` actor under `verified`, so a sign-off reaches
+the permission prompt even in auto mode. It is stdlib-only, runs through
+`uv run --script`, and fails closed. `tests/test_hooks.py` feeds it real events.
 
 **A plugin's MCP tools carry the plugin's prefix**:
 `mcp__plugin_<plugin>_<server>__<tool>`, as `kb-query`'s do. The test fails on

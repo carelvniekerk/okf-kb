@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Edit(**/*.md)",
+            "command": "uv",
+            "args": ["run", "--script", "${CLAUDE_PLUGIN_ROOT}/hooks/guard-human-signoff.py"],
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "if": "Write(**/*.md)",
+            "command": "uv",
+            "args": ["run", "--script", "${CLAUDE_PLUGIN_ROOT}/hooks/guard-human-signoff.py"],
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

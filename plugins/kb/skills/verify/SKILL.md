@@ -74,7 +74,8 @@ If the user declines or hesitates, leave the article unverified and say so.
 
 ## 4. Append the entry
 
-Only after an explicit yes, add to the article's frontmatter:
+Only after an explicit yes, add to the article's frontmatter.
+A hook in the `kb` plugin sends any edit that adds a `human:` entry to the user's permission prompt, so the user approves the write itself as well; that prompt is expected.
 
 ```yaml
 verified:
