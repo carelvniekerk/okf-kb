@@ -3,14 +3,11 @@ name: wiki
 description: >
   Search the user's own knowledge bases (OKF wikis) and read what they say, before
   answering from training data or searching the web. Use when the user asks what
-  they know, wrote, read or discussed about a topic, whether an article exists on
-  it, or how two topics in their notes relate, and before starting research or a
-  compile on a topic.
-when_to_use: >
-  Trigger phrases: "what do we know about", "have I covered", "is there an article on",
-  "what's in the wiki", "check the wiki", "search my notes", "what did we say about",
-  "find the article on", "before we research", "what do we already have on",
-  "how does X relate to Y", "everything we have on".
+  they know, wrote, read or discussed about a topic ("what do we know about",
+  "what did I write on", "what did we say about", "search my notes", "check the
+  wiki"), whether an article exists on it ("is there an article on", "have I
+  covered"), how two topics in their notes relate, or for everything they have on
+  a subject, and before starting research or a compile on a topic.
 allowed-tools: mcp__plugin_kb-query_okf-kb__bundles mcp__plugin_kb-query_okf-kb__search mcp__plugin_kb-query_okf-kb__neighbours mcp__plugin_kb-query_okf-kb__roots mcp__plugin_kb-query_okf-kb__shortest_path mcp__plugin_kb-query_okf-kb__read
 ---
 

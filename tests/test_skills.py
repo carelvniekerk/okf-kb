@@ -52,6 +52,20 @@ KNOWN_KEYS = {
     "metadata",
 }
 
+#: The only frontmatter keys a claude.ai upload or the Skills API accepts. Any
+#: other key fails the upload with a hard error.
+SPEC_KEYS = {
+    "name",
+    "description",
+    "license",
+    "compatibility",
+    "metadata",
+    "allowed-tools",
+}
+
+#: Skills the README tells users to zip and upload to the Claude desktop app.
+UPLOADED = {"kb-query/wiki"}
+
 #: Skills Claude may invoke on its own. Every other skill writes files or
 #: commits, so only the user starts it.
 MODEL_INVOCABLE = {"kb-query/wiki"}
@@ -97,6 +111,14 @@ def test_frontmatter_is_well_formed(path):
     assert len(meta["description"]) <= 1024
     assert len(meta["description"]) + len(meta.get("when_to_use", "")) <= 1536
     assert not re.search(r"\b(MUST|FIRST|ALWAYS|NEVER)\b", meta["description"])
+
+
+@pytest.mark.parametrize("path", [p for p in SKILLS if _id(p) in UPLOADED], ids=_id)
+def test_uploaded_skills_use_only_spec_fields(path):
+    """Claude Code ignores unknown keys, but claude.ai rejects them."""
+    meta, body = _split(path)
+    assert set(meta) <= SPEC_KEYS, set(meta) - SPEC_KEYS
+    assert "${CLAUDE_" not in body
 
 
 @pytest.mark.parametrize("path", SKILLS, ids=_id)
