@@ -1,80 +1,58 @@
 ---
 name: ingest
 description: >
-  Ingest a new source into the knowledge base — handles arXiv papers, local PDFs, web clippings,
-  and manual notes already in raw/.
-  Fetches content, localises images, commits, and offers to compile.
-  YouTube videos are handled by /kb-video:video instead.
-when_to_use: When the user provides a source to ingest (arXiv ID, URL, PDF path, or raw/ file) and asks to add it to the knowledge base.
-allowed-tools: Read Write Bash(kb-ingest *) Bash(kb-doctor *) Bash(git *) WebFetch
+  Add a source to the knowledge base's raw zone. Fetches arXiv papers, converts
+  local PDFs with their figures, clips web pages verbatim and localises images,
+  then logs, commits and offers to compile. Use when the user gives an arXiv id,
+  a URL, a PDF path or a file already in raw/ and wants it added to the knowledge
+  base. YouTube videos belong to /kb-video:video.
 disable-model-invocation: true
-argument-hint: <arXiv ID, URL, file path, or "raw/...">
+allowed-tools: Read Edit Bash(kb-ingest *) Bash(kb-doctor) Bash(kb-doctor *) Bash(git add *) Bash(git commit *) Bash(date *)
+argument-hint: <arXiv id, URL, PDF path, or a file in raw/>
 ---
 
 # Ingest
 
-Ingest a new source into the knowledge base. The source is: $ARGUMENTS
+Add a source to the knowledge base. The source is: $ARGUMENTS
 
-Determine the source type from the argument and follow the appropriate workflow:
+A raw source is the record every compiled claim is later verified against, so store what the source says and never a summary of it.
+Every step below goes through `kb-ingest`, which saves the content verbatim.
+Do not use WebFetch to save a page: it returns a model's rendering of the page, not the page.
 
-## arXiv paper (ID like `2402.12345` or arXiv URL)
+## Workflow
 
-1. Run `kb-ingest arxiv <arxiv-id>` — this fetches the ar5iv HTML (or falls back to PDF), saves markdown to `raw/papers/<arxiv-id>.md`, and downloads figures to `raw/images/<arxiv-id>/`.
-2. Check the output for warnings (e.g. very few section headings = incomplete conversion).
-3. Commit: `git add raw/papers/ raw/images/ && git commit -m "ingest: arxiv <arxiv-id>"`.
-4. Append to `wiki/log.md`: `## [YYYY-MM-DD] 📥 ingest | arXiv <arxiv-id> — <paper title>`
-5. Ask whether to compile the new paper into the wiki now or defer.
+1. Run `kb-doctor paths`.
+   Its `raw` and `log` values are what this skill calls `<raw>` and `<log>`.
+   Run the commands below from the bundle root it prints.
+2. Pick the row for the argument, run its command and read the output for warnings:
 
-## Local PDF (file path)
+   | Source | Command | Lands in |
+   | --- | --- | --- |
+   | arXiv id or arxiv.org URL | `kb-ingest arxiv <id>` | `<raw>/papers/<id>.md`, figures in `<raw>/images/<id>/` |
+   | Local PDF | `kb-ingest extract-pdf <path>` | Markdown beside the PDF, figures in `<raw>/images/<stem>/` |
+   | Web page URL | `kb-ingest clip <url>` | `<raw>/clippings/<slug>.md`, images in `<raw>/images/<slug>/` |
+   | A markdown file already in `<raw>` | `kb-ingest download-images <file>`, only if it links external images | In place |
+   | YouTube URL | none: stop and point the user to `/kb-video:video` | |
 
-1. Run `kb-ingest extract-pdf <path>` to produce a markdown file.
-2. If the PDF contains figures, run `kb-ingest download-images <output.md>` to fetch and localise any image references.
-3. Commit: `git add raw/ && git commit -m "ingest: <filename>"`.
-4. Append to `wiki/log.md`: `## [YYYY-MM-DD] 📥 ingest | <filename>`
-5. Ask whether to compile now or defer.
+   A PDF outside `<raw>` should be moved or copied into `<raw>/papers/` first, with the user's agreement, so the source lives in the bundle.
+   An arXiv warning about few section headings means the conversion is likely incomplete: tell the user, and offer to delete the markdown and re-ingest from the PDF.
+3. Commit what the command wrote: `git add <raw> && git commit -m "ingest: <short description>"`.
+4. Append one line to `<log>` with the Edit tool, keeping the existing entries:
+   `## [YYYY-MM-DD] 📥 ingest | <arXiv id: title, file name or page title>`
+5. Ask whether to compile the new source now or later.
 
-## Web clipping (URL or file in `raw/clippings/`)
-
-1. If a URL was given, fetch the page and save as markdown to `raw/clippings/<slug>.md`.
-2. Run `kb-ingest download-images raw/clippings/<slug>.md` to localise images to `raw/images/<slug>/`.
-3. Commit: `git add raw/clippings/ raw/images/ && git commit -m "ingest: clipping <slug>"`.
-4. Append to `wiki/log.md`: `## [YYYY-MM-DD] 📥 ingest | <slug>`
-5. Ask whether to compile now or defer.
-
-## YouTube video (URL like `https://www.youtube.com/watch?v=...`)
-
-Defer to the `/kb-video:video` skill — it stages raw materials in `video_scratch/`, judges transcript quality, extracts key frames via ffmpeg, and writes a structured discussion article in `raw/videos/<slug>-<id>.md`.
-Do not invoke `kb-ingest` for videos.
-
-## Manual note (already in `raw/`)
-
-1. Confirm the file exists and is readable.
-2. Run `kb-ingest download-images <file>` if it contains external image URLs.
-3. Commit any changes: `git add raw/ && git commit -m "ingest: <filename>"`.
-4. Append to `wiki/log.md`: `## [YYYY-MM-DD] 📥 ingest | <filename>`
-5. Ask whether to compile now or defer.
-
-If the argument is unclear or missing, ask the user to specify the source.
+If the argument is missing or ambiguous, ask which source the user means.
 
 ## When `kb-ingest` reports a missing extra
 
-Every command here needs the `[ingest]` extra (`pymupdf`, `requests`,
-`beautifulsoup4`, `markdownify`). It is imported lazily, so `kb-ingest` runs
-and only fails at the step that needs it, with:
+Every `kb-ingest` command except `list-untranscribed` needs the `[ingest]` extra.
+It is imported lazily, so the command starts and fails at the step that needs it, with a message that begins:
 
 ```
 kb-ingest needs the okf-kb [ingest] extra, which is not installed …
 ```
 
-**Relay the install command in that message verbatim.** It is chosen for how the
-package was actually installed — a uv tool, a project venv, or a source
-checkout — and it names every extra the user already has, because
-`uv tool install --force` replaces the environment and a narrower command would
-silently remove their `[video]` support. Do not substitute `uv add pymupdf` or
-`pip install requests`: those land in the current project, not in the
-environment `kb-ingest` runs from.
-
-`kb-doctor` prints the same picture for every extra at once if you want to
-confirm before or after.
-
-Stop after reporting it. Do not commit, and do not log a half-finished ingest.
+Relay the install command in that message verbatim.
+It is chosen for how the package was installed and keeps every extra the user already has, because `uv tool install --force` replaces the environment and a narrower command would remove `[video]`.
+Never suggest `uv add pymupdf` or `pip install requests`: those install into the current project, not into the environment `kb-ingest` runs from.
+Then stop, without committing or logging a half-finished ingest.

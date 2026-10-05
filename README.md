@@ -210,11 +210,11 @@ The skills drive these; you can also run them directly.
 | `kb-graph` | Walk the wiki's cross-links: section roots, one article's backlinks, neighbours, shortest path |
 | `kb-read` | Print one article, or one section of it, from any knowledge base in scope; refuses paths outside the wikis |
 | `kb-provenance` | Map, retract, classify and migrate source provenance |
-| `kb-ingest` | Fetch arXiv papers, extract PDFs, convert HTML, localise images |
+| `kb-ingest` | Fetch arXiv papers, extract PDFs with their figures, clip web pages verbatim, convert HTML, localise images |
 | `kb-export` | Marp slide decks, or the whole wiki flattened to one file |
 | `kb-video` | Stage a YouTube video's captions, audio and frames |
 | `kb-mcp` | The read-only wiki tools as a stdio MCP server, for the `wiki` skill and the Claude desktop app |
-| `kb-doctor` | Report which extras are installed, and what to run to add the rest; `kb-doctor bundles` lists the knowledge bases in scope |
+| `kb-doctor` | Report which extras are installed, and what to run to add the rest; `kb-doctor bundles` lists the knowledge bases in scope; `kb-doctor paths` prints what the enclosing bundle calls its zones |
 
 Every command finds its bundle by walking up from the working directory looking
 for `okf.toml`, the way `git` finds `.git`. They run from anywhere inside a

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "kb-ingest",
-  "description": "Source acquisition for an Open Knowledge Format knowledge base: fetch arXiv papers, convert PDFs and web pages to markdown, download referenced images locally, and transcribe handwritten notes with vision. Needs the okf-kb package's [ingest] extra, which brings pymupdf, requests, beautifulsoup4 and markdownify.",
+  "description": "Source acquisition for an Open Knowledge Format knowledge base: fetch arXiv papers, convert PDFs to markdown with their figures, clip web pages verbatim, download referenced images locally, and transcribe handwritten notes with vision. Needs the okf-kb package's [ingest] extra, which brings pymupdf, requests, beautifulsoup4 and markdownify.",
   "author": {
     "name": "Carel van Niekerk",
     "email": "code@carelvanniekerk.com",

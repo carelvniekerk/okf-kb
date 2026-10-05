@@ -1,0 +1,7 @@
+,
+        {
+            "label": "🕸️ Graph",
+            "type": "vscode-command",
+            "command": "foam-vscode.show-graph",
+            "presentation": { "reveal": "never", "focus": false, "panel": "shared" }
+        }

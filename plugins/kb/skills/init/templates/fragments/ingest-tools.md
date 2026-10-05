@@ -1,0 +1,1 @@
+- **`kb-ingest`**: `arxiv`, `clip` (a web page, verbatim), `extract-pdf` (text and figures), `html-to-md`, `download-images`, `list-untranscribed`. Needs the `[ingest]` extra.

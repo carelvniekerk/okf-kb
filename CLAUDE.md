@@ -58,15 +58,18 @@ src/okf_kb/            # the Python package — one module per kb-* command
 
 plugins/               # the Claude Code marketplace — one directory per plugin
 ├── kb/                # init, adopt, compile, health, verify
+│   ├── references/    # house-style.md, tooling.md: read via ${CLAUDE_PLUGIN_ROOT}
 │   └── skills/init/templates/   # what /kb:init scaffolds INTO a bundle
 ├── kb-query/          # wiki (read-only), via the kb-mcp server in .mcp.json
+│   └── evals/         # claude plugin eval suite: trigger and near-miss cases
 ├── kb-ingest/         # ingest, transcribe            needs [ingest]
 ├── kb-video/          # video                         needs [video] + ffmpeg
 └── kb-capture/        # capture, meeting, update-brief
 
 .claude-plugin/marketplace.json   # lists the five plugins
 okf.toml.example                  # every key, documented, with its default
-tests/                            # pytest, one file per module
+tests/                            # pytest, one file per module, plus
+                                  # test_skills.py for the skills' contracts
 ```
 
 ### Two files named CLAUDE.md
@@ -220,6 +223,34 @@ catches it, or typer prints a traceback over the useful message; that is why
 `kb-ingest`'s entry point is `okf_kb.ingest:main`, not `:app`.
 
 ## Skill conventions
+
+**Never hardcode `raw/` or `wiki/` in a skill.** A skill that writes into a
+bundle runs `kb-doctor paths` first and writes `<raw>`, `<wiki>` and `<log>`
+thereafter, because `/kb:adopt` keeps a folder's own zone names. The same
+reasoning as the package rule above; `tests/test_skills.py` enforces it.
+
+**Bundled files go through the path variables.** `${CLAUDE_SKILL_DIR}` for a
+skill's own `references/` and `templates/`, `${CLAUDE_PLUGIN_ROOT}` for a
+plugin's shared `references/`. A bare relative path resolves against the
+user's working directory, and `../` out of the plugin is not copied into the
+install cache. Each plugin that writes prose ships its own identical
+`references/house-style.md`; a test keeps the copies in step.
+
+**Keep a skill under the compaction budget.** After auto-compaction only the
+first 5,000 tokens of a skill come back, so a `SKILL.md` holds the workflow and
+the rules most often broken, and per-variant detail moves to `references/`
+(see `capture`). Files over 100 lines open with a `## Contents` list.
+
+**Grant narrowly and stage narrowly.** `allowed-tools` names the git
+subcommands a skill uses, never `Bash(git *)`, which pre-approves `push` and
+`reset --hard`. Commits stage the files the skill wrote, never `git add -A`,
+because a live meeting note stays uncommitted by design. Every skill except
+`/kb-query:wiki` sets `disable-model-invocation: true`, since each writes files
+or commits.
+
+**A plugin's MCP tools carry the plugin's prefix**:
+`mcp__plugin_<plugin>_<server>__<tool>`, as `kb-query`'s do. The test fails on
+a grant that names a server the plugin does not ship.
 
 **Address every skill by the plugin that ships it** — `/kb-capture:capture`,
 not `/kb:capture`; `/kb-video:video`, not `/video`. This applies in skill

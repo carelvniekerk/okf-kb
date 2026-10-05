@@ -1,41 +1,30 @@
 ---
 name: transcribe
 description: >
-  Transcribe any untranscribed handwritten notes in raw/handwritten/ into clean structured markdown.
-  Saves transcriptions to raw/transcriptions/.
-  Never modifies or deletes files in raw/handwritten/ (it is a symlinked external directory).
-when_to_use: When the user says "transcribe handwritten notes", "process handwritten", or types /kb-ingest:transcribe.
-allowed-tools: Read Write Bash(kb-ingest list-untranscribed) Bash(git *)
+  Transcribe handwritten notes in raw/handwritten/ that have no transcription yet
+  into clean structured markdown in raw/transcriptions/, without touching the
+  originals. Use when the user says "transcribe my handwritten notes" or "process
+  handwritten".
 disable-model-invocation: true
+allowed-tools: Read Write Bash(kb-ingest list-untranscribed) Bash(kb-doctor paths) Bash(git add *) Bash(git commit *)
 ---
 
 # Transcribe
 
-Transcribe any untranscribed handwritten notes in `raw/handwritten/`.
+Transcribe every handwritten note in `<raw>/handwritten/` that has no transcription yet.
+Never modify, move or delete anything in `<raw>/handwritten/`, because the originals are the source, and the folder is often a link to a note app's export directory outside the bundle.
 
-**Critical: Never modify or delete any files in `raw/handwritten/`. It is a symlinked external directory.**
+## Workflow
 
-## 1. Identify untranscribed files
-
-Run `kb-ingest list-untranscribed` to identify files in `raw/handwritten/` that do not yet have a transcription in `raw/transcriptions/`.
-If there are none, report that everything is already transcribed and stop.
-
-## 2. Transcribe each file
-
-For each untranscribed file:
-a. Open and read the image/PDF using vision.
-b. Transcribe the handwritten content into clean, structured markdown.
-c. Preserve the original structure: headings, bullet points, diagrams described as text, arrows as relationships.
-d. For mathematical notation, use LaTeX syntax: `$inline$` and `$$display$$`.
-e. If the handwriting is ambiguous, include a `<!-- unclear: ... -->` comment rather than guessing.
-f. Save the transcription to `raw/transcriptions/<original-filename>.md`.
-
-## 3. Commit
-
-```bash
-git add raw/transcriptions/ && git commit -m "transcribe: <N> handwritten notes"
-```
-
-## 4. Offer to compile
-
-Ask whether to compile the new transcriptions into the wiki now or defer.
+1. Run `kb-doctor paths` and take `<raw>` from its `raw` value.
+2. Run `kb-ingest list-untranscribed`.
+   If it lists nothing, say that everything is transcribed and stop.
+3. For each listed file:
+   - read the image or PDF with vision;
+   - transcribe it into structured markdown, keeping the original headings and bullets, describing diagrams in text and writing arrows as relationships;
+   - write maths in LaTeX, `$inline$` and `$$display$$`;
+   - mark anything you cannot read as `<!-- unclear: ... -->` rather than guessing;
+   - save it as `<raw>/transcriptions/<stem>.md`, where `<stem>` is the original filename without its extension.
+     `list-untranscribed` matches on the stem, so `note.png.md` would be transcribed again on every run.
+4. Commit: `git add <raw>/transcriptions/ && git commit -m "transcribe: <N> handwritten notes"`.
+5. Ask whether to compile the new transcriptions now or later.

@@ -1,308 +1,203 @@
 ---
 name: compile
 description: >
-  Run the full knowledge base compilation pipeline — transcribes handwritten notes, converts PDFs,
-  detects new/modified/deleted sources, integrates each with type-dependent strategies
-  (technical/discussion/experiment/meeting), updates INDEX.md, runs health checks, and commits.
-when_to_use: When the user says "compile", "update wiki", "process new sources", or types /kb:compile.
-allowed-tools: Read Write Edit Bash(kb-*) Bash(git *) Bash(grep *)
+  Run the knowledge base compilation pipeline. Transcribes handwritten notes,
+  converts PDFs, detects new, modified and deleted sources since the last compile,
+  integrates each into the wiki with a strategy chosen by source type, regenerates
+  the indexes, runs the health check and commits. Use when the user says
+  "compile", "update the wiki" or "process new sources".
 disable-model-invocation: true
+allowed-tools: Read Write Edit Bash(kb-*) Bash(git log *) Bash(git diff *) Bash(git status *) Bash(git show *) Bash(git add *) Bash(git commit *) Bash(basename *) Bash(date *) Bash(rg *)
 ---
 
 # Compile
 
-Run the full knowledge base compilation pipeline.
-This is the living knowledge workflow — it classifies sources, discovers related articles, applies type-dependent update strategies, and handles source deletions.
+Integrate new, modified and deleted raw sources into the wiki, with provenance tracked per source.
+The wiki is only as trustworthy as its link to the sources, so the rule that governs every step is: write only what a source supports.
+
+## Contents
+
+- Rules for everything you write
+- 0. Resolve the bundle's paths
+- 1. Transcribe handwritten notes
+- 2. Convert raw PDFs
+- 3. Detect changes
+- 4. Handle deletions
+- 5. Integrate new and modified sources
+- 6. Regenerate the indexes
+- 7. Run the health check
+- 8. Append to the log
+- 9. Commit
+
+## Rules for everything you write
+
+- Every claim in an article must come from one of its sources.
+  Do not add facts, numbers, dates, names or examples from training data, even when you are confident of them.
+  If background is needed to make an article readable, say in the text that it is background and not from the source, or leave it out.
+- Report what the source says, not what you infer from it.
+  Where you draw a connection between sources, write it as an inference ("Taken together, A and B suggest...") and put it under `## 🔮 Open Questions` when it is uncertain.
+- Never write `verified`.
+  Absent means unverified, which is the honest state, and only `/kb:verify` may add it.
+- Never hand-edit an `INDEX.md`, because `kb-index` generates them.
+- Prose follows `${CLAUDE_PLUGIN_ROOT}/references/house-style.md`.
+
+## 0. Resolve the bundle's paths
+
+Run `kb-doctor paths`.
+Its `wiki`, `raw` and `log` values are what this skill calls `<wiki>`, `<raw>` and `<log>`, and they are not always `wiki/` and `raw/`.
+Run every command below from the bundle root it prints.
 
 ## 1. Transcribe handwritten notes
 
-Run `kb-ingest list-untranscribed` to find any untranscribed files in `raw/handwritten/`.
-For each new file, open and read it using vision, transcribe the content to clean structured markdown (preserving headings, bullets, LaTeX for math, `<!-- unclear: ... -->` for ambiguous text), and save to `raw/transcriptions/<original-filename>.md`.
-If any were transcribed, commit with `git add raw/transcriptions/ && git commit -m "transcribe: <N> handwritten notes"`.
+Run `kb-ingest list-untranscribed`.
+For each file it lists, read it with vision and write clean structured markdown to `<raw>/transcriptions/<stem>.md`, where `<stem>` is the source filename without its extension, because that is how `list-untranscribed` matches them.
+Keep the original structure, describe diagrams in text, write maths in LaTeX and mark unreadable passages as `<!-- unclear: ... -->` rather than guessing.
+Never modify or delete anything in `<raw>/handwritten/`.
+If you transcribed anything, commit it: `git add <raw>/transcriptions/ && git commit -m "transcribe: <N> handwritten notes"`.
 
 ## 2. Convert raw PDFs
 
-Find any `.pdf` files directly in `raw/` (not in subdirectories) that do not yet have a corresponding `.md` file.
-For each, run `kb-ingest extract-pdf <file>` to produce a markdown file alongside it.
-Images go to `raw/images/<file-stem>/`.
-If any were converted, commit with `git add raw/ && git commit -m "ingest: convert <N> PDFs to markdown"`.
+Find `.pdf` files in `<raw>` and its subdirectories that have no `.md` beside them, and run `kb-ingest extract-pdf <file>` on each.
+It writes the markdown beside the PDF and saves embedded figures to `<raw>/images/<stem>/`, linked from the markdown.
+If any were converted, commit them: `git add <raw> && git commit -m "ingest: convert <N> PDFs to markdown"`.
 
-## 3. Detect all changes
+`extract-pdf` needs the `[ingest]` extra, which the `kb` plugin does not.
+If it reports the extra missing, skip this step, list the unconverted PDFs in the log entry and relay the install command from the error verbatim.
+Never compose an install command yourself.
 
-Compare against the **last compile**, not the working tree.
-`/kb-ingest:ingest`, `/kb-capture:capture`, `/kb-ingest:transcribe` and `/kb-video:video` all commit the raw source and *then* offer to compile, so by the time compile runs the working tree is clean and a `HEAD` diff sees nothing.
+## 3. Detect changes
+
+Compare against the last compile, not the working tree.
+The ingest, capture, transcribe and video skills commit or stage the raw source and then offer to compile, so a `HEAD` diff alone sees nothing.
+`init:` commits count as a baseline too, so the first compile after `/kb:adopt` does not re-integrate everything the adoption just mapped.
 
 ```bash
-LAST=$(git log -1 --format=%H --grep='^compile:')
-git diff --name-only --diff-filter=AM "$LAST"..HEAD -- raw/   # new and modified
-git diff --name-only --diff-filter=D  "$LAST"..HEAD -- raw/   # deleted
-git status --porcelain -- raw/                                 # plus uncommitted edits
+LAST=$(git log -1 --format=%H -E --grep='^(compile|init):')
+git diff --name-only --diff-filter=AM "$LAST"..HEAD -- <raw>   # new and modified
+git diff --name-only --diff-filter=D  "$LAST"..HEAD -- <raw>   # deleted
+git status --porcelain -- <raw>                                 # not yet committed
 ```
 
-If no prior compile commit exists, treat every file in `raw/` as new (excluding `raw/handwritten/`).
+If `LAST` is empty, there is no baseline: treat every file in `<raw>` as new, except `<raw>/handwritten/`.
 
-**Skip any source whose frontmatter carries `compile: false`.**
-It is an explicit opt-out; note each skip in the log entry (Step 8) as `⏭️ <path> — opted out via compile: false`.
+Uncommitted files need the user's word before they are compiled.
+A live meeting note from `/kb-capture:meeting` stays uncommitted until the meeting ends, and a video article from `/kb-video:video` is written but not committed.
+List the uncommitted files and ask which to include.
 
-Separate the results into three lists: **new sources**, **modified sources**, and **deleted sources**.
+Skip any source whose frontmatter has `compile: false`, and note each skip in the log as `⏭️ <path>: opted out via compile: false`.
+Separate the rest into new, modified and deleted sources.
 
 ## 4. Handle deletions
 
-For each deleted raw source:
+For each deleted source:
 
-1. Run `kb-provenance affected --json <deleted-file>` to find affected wiki articles.
-2. For each affected article:
-   a. Read the article.
-   Look for `<!-- source: <deleted-file> -->` ... `<!-- /source -->` comment blocks.
-   b. **If source boundary comments exist**: remove that entire content block.
-   c. **If no boundary comments** (legacy article): read the article and the deleted source's last known content via `git show HEAD~1:<path>`.
-   Use your judgment to identify and remove content that originated from the deleted source.
-   d. Remove that source's entry from the `sources` array in frontmatter (match on `resource`).
-   e. If the removed source was cited by `[^<id>]` footnotes, remove those references too — a footnote pointing at a deleted source is a broken citation.
-   f. Update `date_updated` to today.
-   g. Remove the deleted source from the `## Sources` section.
-3. **If an article has zero remaining sources after removal**:
-   - Check if other articles link to it (grep the wiki for its relative path).
-   - If it has incoming links, keep it but add a blockquote at the top: `> ⚠️ This article's original sources have been removed. Content retained for cross-reference continuity.`
-   - If it is an orphan with no incoming links, delete the file and remove its entry from `wiki/INDEX.md`.
-4. After all deletions are processed, run `kb-health` to catch broken links.
-Fix any that appear.
+1. Run `kb-provenance affected --json <path>` to find the affected articles.
+2. Recover the source's last content from the commit before the one that deleted it:
+
+   ```bash
+   DEL=$(git log -1 --format=%H --diff-filter=D -- <path>)
+   git show "$DEL^:<path>"
+   ```
+
+3. In each affected article, remove the `<!-- source: <path> -->` ... `<!-- /source -->` blocks.
+   Where an older article has no markers, compare it with the recovered content and remove what came from that source.
+4. Remove the source's entry from `sources` (matched on `resource`), its `[^<id>]` footnotes and its line under `## Sources`, and set `date_updated` to today.
+5. If an article has no sources left, search `<wiki>` for links to it.
+   With incoming links, keep it and add `> ⚠️ This article's original sources have been removed. Content retained for cross-reference continuity.` at the top.
+   Without them, delete the file. Step 6 drops it from the indexes.
+
+Then run `kb-health` and fix the broken links it reports.
 
 ## 5. Integrate new and modified sources
 
-For each new or modified source file:
+For each source, in order:
 
-### 5.0. Pre-process daily briefs (if applicable)
+1. Pre-process it if it is a daily brief or a video source, as `${CLAUDE_SKILL_DIR}/references/strategies.md` describes.
+2. Read it fully, run `kb-provenance classify <file> --json` as a hint and classify it yourself as `technical`, `discussion`, `experiment` or `meeting`.
+3. Find related articles: `kb-search "<key terms>" --json-output`, then `kb-provenance map --json` to see whether this source already feeds an article.
+   Read the top three to five hits to judge real relatedness.
+4. Decide where it goes.
+   A modified source that already feeds articles updates those articles without asking, and you say which.
+   Otherwise, if related articles exist, show them numbered with a one-line reason each, offer "update one of these" or "create a new article", and wait for the answer.
+   With no related articles, create a new one.
+5. Write the content with the strategy for its type from `${CLAUDE_SKILL_DIR}/references/strategies.md`.
+   Read that file the first time you integrate a source in this run.
+6. Update the metadata, as below.
 
-If the source path is under `raw/daily-briefs/` (or has `type: daily-brief` in frontmatter), apply this pre-processing before anything else.
-Daily briefs are partially ephemeral — they contain personal/transient content alongside knowledge-worthy notes.
+### New articles
 
-1. **Extract only the `## 📝 Notes` section** of the brief.
-   Include any `_Update HH:MM:_` timestamped additions inside it.
-2. **Ignore entirely** these sections — never compile their content into the wiki:
-   - `## 🙂 Mood`
-   - `## 📅 Today`
-   - `## 🔜 Tomorrow — key items`
-   - `## 🧭 Focus`
-   - `## ✅ Todos — Today`
-   - `## 🔁 Pushed to Tomorrow`
-   - `## 🔁 Follow-ups`
-   - `## 📧 Inbox Signal — last 2 days`
-   - `## 📂 Raw Transcript`
-   - Any `## 🔄 Session N` blocks (treat them the same way — only their notes sub-content is eligible).
-3. **If the extracted Notes section is empty or trivial** (e.g. only whitespace, one short sentence with no identifiable topic), **skip the source entirely**.
-   Note the skip in the compile log entry (Step 8) as `⏭️ raw/daily-briefs/YYYY-MM-DD.md — no knowledge-worthy notes`.
-4. **Otherwise**, treat the extracted Notes content as the effective source content for steps 5a–5e below.
-   When writing provenance markers in 5d, still use the full brief path: `<!-- source: raw/daily-briefs/YYYY-MM-DD.md -->`.
-5. A single brief's Notes may contain multiple distinct topics.
-   If so, process each topic as its own integration — do not force-merge unrelated notes into one article.
+Follow the article format in the bundle's `CLAUDE.md`, and also:
 
-### 5.0b. Pre-process video sources (if applicable)
+- set `type`, `title` and a one-sentence `description` that reads on its own, because the indexes are generated from it;
+- set `source_type` to the classification;
+- add a `sources` entry per raw source with `id` (kebab-case, unique in the article), `resource` (the root-relative path), `title`, `author` and `last_modified`;
+- stamp `generated` with your model id, an ISO 8601 UTC timestamp and `skill: compile@<version>`, then `commit` once committed;
+- leave `status` at `stable` unless the article is genuinely `draft` or `deprecated`, and add `stale_after` when the content is pinned to a moving target such as a library version;
+- wrap the content in `<!-- source: <path> -->` ... `<!-- /source -->` markers.
 
-Sources under `raw/videos/<slug>-<id>.md` come from the `/kb-video:video` skill and are already a fully-structured article.
-Treat them as a **promote**, not a re-synthesis:
+Find `<version>` once per run, so a bad article can be traced to the copy of this skill that wrote it.
+An installed plugin lives in a cache directory named after the okf-kb commit it was installed from, and that directory is not a git repository:
 
-- Keep the source's tags, type, and `source_type` as the basis for the wiki article's frontmatter.
-- The Key Takeaways and Open Questions can usually carry over verbatim or with light editing.
-- **Image paths must be rewritten.**
-  The source uses `../images/<slug>-<id>/frame-XX.jpg` (relative to `raw/videos/`); a wiki article must use `../raw/images/<slug>-<id>/frame-XX.jpg` (relative to `wiki/`).
-- Discovery (5b) and prompting (5c) still apply.
+```bash
+basename "${CLAUDE_PLUGIN_ROOT}"
+```
 
-### 5a. Classify the source
+If that prints a hexadecimal hash, it is the version.
+Otherwise this is a checkout loaded with `--plugin-dir`, and the last commit to touch the plugin is:
 
-Read the source fully.
-Run `kb-provenance classify <file> --json` as a heuristic hint, then make your own judgment.
-Classify as one of:
+```bash
+git -C "${CLAUDE_PLUGIN_ROOT}" log -1 --format=%h -- .
+```
 
-| Type | Description | Examples |
-|---|---|---|
-| `technical` | Documentation, tutorials, technical references, papers, tool guides | arXiv papers, API docs, installation guides |
-| `discussion` | Design debates, consensus-building, architectural decisions | RFC discussions, design docs, pros/cons analyses |
-| `experiment` | Benchmarks, ablation studies, A/B test outcomes, evaluation results | Experiment logs, benchmark tables, eval reports |
-| `meeting` | Action items, decisions, status updates, meeting minutes | Standup notes, sprint reviews, 1:1 notes |
+If neither gives a hash, write a bare `skill: compile` rather than inventing one.
 
-### 5b. Discover related articles
+### Metadata after every integration
 
-Search for existing related articles:
-1. Run `kb-search "<key terms from source>" --json-output` to find semantically related articles.
-2. Run `kb-provenance map --json` to check if this source already contributes to existing articles (critical for modified sources).
-3. Read the top 3–5 search results to assess genuine relatedness.
-
-### 5c. Prompt the user
-
-**If related articles are found**, present the user with clear options:
-
-> 📋 Source `raw/meeting-april-8.md` classified as **meeting**.
-> Found related articles:
->
-> 1. 📄 [Project X Meeting Log](wiki/meetings/project-x.md) — 85% related (same project)
-> 2. 📄 [Architecture Decisions](wiki/research/architecture.md) — 40% related (overlapping topic)
->
-> Options:
-> - **(a)** Update **Project X Meeting Log**
-> - **(b)** Update **Architecture Decisions**
-> - **(c)** Create a **new article**
-
-Wait for the user's response before proceeding.
-
-**If no related articles are found**, proceed directly to create a new article.
-
-**For modified sources** that already have wiki articles (found via `kb-provenance map`), default to updating those articles without prompting — but mention what you're doing.
-
-### 5d. Apply type-dependent integration strategy
-
-Everything you write into an article, its `description` and the log entry follows the Writing style section of the bundle's `CLAUDE.md`.
-The core of it is restated here because a bundle scaffolded before those rules existed will not have them:
-
-- No em-dashes in prose. Use commas, full stops, colons or brackets. Frontmatter is the exception: never swap an em-dash for a colon in a YAML value, because an unquoted `: ` does not parse. Reword, use a full stop, or leave the em-dash.
-- Plain sentences in the active voice, British English. Use the passive only where the agent is genuinely irrelevant or unknown.
-- Sentence case for any heading you add. The template's own headings stay as written.
-- No antithesis framing ("not just X, but Y"), colon-then-reveal ("The result: chaos"), rule-of-three padding, fragments for emphasis, or one-line paragraphs used as a drum beat.
-- No filler hedges ("it's worth noting", "that said", "at its core") and none of: delve, leverage, harness, unlock, seamless, robust, holistic, pivotal, underscore, foster, testament to, landscape, realm, deep dive, game-changer, elevate.
-- One name per thing. Do not vary the term for the same concept within a document.
-
-Quotations, code and equations stay as the source has them.
-
-#### Creating a new article
-
-Follow the standard article format from CLAUDE.md.
-Additionally:
-- Set `type`, `title` and a one-sentence `description` (the indexes are generated from `description`, so write it to stand alone).
-- Set `source_type` to the classification from 5a.
-- Add an entry to `sources` for each raw source: `id` (kebab-case, unique in the article), `resource` (repo-root-relative `raw/...` path), `title`, `author`, `last_modified`.
-- Stamp `generated` with your own model id, an ISO 8601 UTC timestamp, `skill: compile@<sha>`, and `commit` once committed. The sha is the last commit to touch this skill's own source, so a hallucination traces back to the exact copy that emitted it. Take it from wherever the skill is installed:
-
-  ```bash
-  git -C "${CLAUDE_PLUGIN_ROOT}" log -1 --format=%h -- .   # installed as the kb plugin
-  git log -1 --format=%h -- .claude/skills/compile/        # a bundle's own in-repo copy
-  ```
-
-  Plugins carry no version number, so there is nothing else to stamp. If neither command resolves, write a bare `skill: compile` rather than inventing a version.
-- Leave `status` at `stable` unless the article is genuinely provisional (`draft`) or superseded (`deprecated`).
-- Add `stale_after` if the content is pinned to a moving target — library versions, build steps, a project's lifespan.
-- **Never write `verified`.** Absent means unverified, which is the honest state. Only `/kb:verify` may add it.
-- Set `date_updated` to today.
-- Wrap the main content in source provenance markers:
-
-  ```markdown
-  <!-- source: raw/path/to/source.md -->
-  ... content derived from this source ...
-  <!-- /source -->
-  ```
-
-#### Updating an existing article — Meeting sources (`meeting`)
-
-Meetings are **additive** — never overwrite previous meeting content.
-- Find or create a chronological section (e.g., `## Meeting History` or `## Session Log`).
-- Append new meeting information with a date subheading: `### YYYY-MM-DD — <meeting topic>`.
-- Extract **action items** into a dedicated subsection.
-Mark items from previous meetings as completed (✅) if the new meeting confirms completion.
-- Extract **decisions** and add them to a running decisions list or table.
-- Update `## 🎯 Key Takeaways` to reflect the latest state and most important decisions.
-- Update `## 🔮 Open Questions` — resolve questions answered by new meeting, add new ones.
-- Wrap new content in `<!-- source: raw/path -->` ... `<!-- /source -->` markers.
-
-#### Updating an existing article — Discussion sources (`discussion`)
-
-Discussions **evolve** — track how consensus changes.
-- If the new source extends an existing discussion thread:
-  - Add new points under existing headings where they fit.
-  - If a position has been superseded, mark it with ~~strikethrough~~ or a `**[Superseded YYYY-MM-DD]**` label, and add the new position.
-  - Track consensus evolution — if a decision was reached, make it prominent.
-- If the new source opens a new thread within the same topic:
-  - Add a new subsection for the new discussion thread.
-- Update `## 🎯 Key Takeaways` to reflect current consensus.
-- Update `## 🔮 Open Questions` — resolve settled questions, add newly raised ones.
-- Wrap new content in source provenance markers.
-
-#### Updating an existing article — Experiment sources (`experiment`)
-
-Experiment results require **careful data management** — never silently overwrite results.
-- **Same experiment, new data**: Append rows to existing results tables.
-Add a note indicating when results were added (e.g., `*Updated YYYY-MM-DD*` below the table).
-- **Same methodology, improved results**: Update the table but keep a "Previous results" collapsed section or footnote so the progression is visible.
-- **Different methodology**: Create a new results table/section clearly labeled with the methodology.
-Do not merge with existing tables.
-- **Contradictory results**: Present both with clear labeling.
-Add to Open Questions why results differ.
-- Update `## 🎯 Key Takeaways` based on the latest and most reliable results.
-- Update `## 🔮 Open Questions` — note resolved questions, add new ones prompted by results.
-- Wrap new content in source provenance markers.
-
-#### Updating an existing article — Technical sources (`technical`)
-
-Technical content should always represent the **current state of knowledge**.
-- **Version-specific information**: If the source mentions specific versions, use version-labeled subsections or admonitions:
-
-  ```markdown
-  > **v2.0** (YYYY-MM-DD): New feature X replaces deprecated feature Y.
-  ```
-
-  Keep version history where it aids understanding; remove stale version info that is no longer relevant.
-- **General updates**: Overwrite stale information cleanly.
-The article should read as a current, authoritative reference — not an archaeological record.
-- **Conflicting information**: If new source contradicts existing content, the new source wins (it is more recent).
-Replace the old content, do not leave both.
-- **Additive information**: If new source adds to existing knowledge without contradicting it, integrate naturally into the existing structure.
-- Update `## 🎯 Key Takeaways` if the update changes core insights.
-- Update `## 🔮 Open Questions` as needed.
-- Wrap new content in source provenance markers.
-
-### 5e. Update metadata
-
-After integrating each source:
-- Add the source to `sources` in frontmatter if not already present (full mapping — `id`, `resource`, `title`, `author`, `last_modified`).
-- Re-stamp `generated` — a substantive rewrite is a new generation event, so record the model and skill version that produced it.
-- Set `date_updated` to today.
-- Add the source to the `## Sources` section as a markdown link.
-- Update `## Related Articles` if cross-references were discovered during integration.
-- Add backlinks in both directions between any articles that reference each other.
-
-### 5f. Keep okf.toml in sync
-
-If a new article landed in a wiki subdirectory that has no entry in `okf.toml`'s
-`[directories]` table, add one with a display title, and place that directory
-in whichever `[[groups]]` entry it best fits — or a new group, if none does.
-A directory absent from every group still renders, under the "📁 Unfiled"
-fallback heading, so this is never required for correctness — but a source
-left there silently is a section that never got named. Do the same for any
-directory renamed or introduced by restructuring during this compile.
+- Add the source to `sources` if it is not there.
+- Re-stamp `generated`, because a substantive rewrite is a new generation event.
+- Set `date_updated` to today and add the source to `## Sources` as a markdown link.
+- Update `## Related Articles` and add backlinks in both directions between articles that now reference each other.
+- If an article landed in a `<wiki>` subdirectory with no `[directories]` entry in `okf.toml`, add one with a display title and place it in the best-fitting `[[groups]]` entry.
+  An unclaimed directory renders under "📁 Unfiled", so this is about naming the section, not correctness.
 
 ## 6. Regenerate the indexes
-
-Do **not** hand-edit any `INDEX.md`. They are generated from article frontmatter:
 
 ```bash
 kb-index --stamp-compiled
 ```
 
-This rewrites `wiki/INDEX.md` and every per-directory `INDEX.md`, recomputing the article count and unique source count. Hand-maintaining those counters is what let the old `sources-41` badge drift away from every real total.
+This rewrites every `INDEX.md` and moves the compile-date badge to today.
+This skill is the only caller allowed to pass `--stamp-compiled`, because the badge records when the wiki was last compiled, not when `kb-index` last ran.
 
-`--stamp-compiled` moves the compile-date badge to today. **This skill is the only caller that may pass it.** Every other invocation — the pre-commit hook, `/kb:verify`, a manual run — leaves the badge as it stands, because the badge records when the wiki was last compiled, not when `kb-index` last ran. A bare `kb-index` preserves it.
-
-The health badge is emitted as `unknown` by default and is only set to passing in step 7.
-
-## 7. Run health check
+## 7. Run the health check
 
 Run `kb-health`.
-- If it passes (exit 0): re-run `kb-index --stamp-compiled --health-passing` to stamp the passing badge. Keep `--stamp-compiled` on this re-run so the date is set explicitly rather than inherited from whatever step 6 happened to leave on disk.
-- If it fails: fix the reported issues first, then re-run until clean. Never pass `--health-passing` without a genuine exit-0 run in this session.
+If it exits 0, run `kb-index --stamp-compiled --health-passing`, keeping `--stamp-compiled` so the date is set explicitly.
+If it fails, fix what it reports and re-run until it exits 0.
+Never pass `--health-passing` without an exit-0 run in this session.
 
-## 8. Append to log
+## 8. Append to the log
 
-Add a detailed entry to `wiki/log.md`:
+Append to `<log>`:
 
 ```markdown
-## [YYYY-MM-DD] 📚 compile | Brief title
+## [YYYY-MM-DD] 📚 compile | <brief title>
 
 **Sources processed:**
-- 🆕 `raw/new-source.md` (technical) → created [New Article](./path/article.md)
-- 🔄 `raw/updated-source.md` (experiment) → updated [Existing Article](./path/article.md)
-- 🗑️ `raw/removed-source.md` → pruned content from [Article](./path/article.md) (2 sources remaining)
+- 🆕 `<raw>/new-source.md` (technical): created [New Article](./path/article.md)
+- 🔄 `<raw>/updated-source.md` (experiment): updated [Existing Article](./path/article.md)
+- 🗑️ `<raw>/removed-source.md`: pruned content from [Article](./path/article.md), 2 sources remaining
 
-**Decisions:** create vs update choices, classification rationale for non-obvious cases.
+**Decisions:** create or update choices, and the reasoning behind any classification that was not obvious.
 ```
 
 ## 9. Commit
 
-Run `git add -A && git commit -m "compile: <brief summary of what was integrated>"`.
+Stage the wiki, `okf.toml` and the raw files you compiled that were not yet committed, and nothing else:
+
+```bash
+git add <wiki> okf.toml <each uncommitted source the user included>
+git commit -m "compile: <brief summary of what was integrated>"
+```
+
+Do not use `git add -A`, because the bundle may hold a live meeting note or other work in progress.

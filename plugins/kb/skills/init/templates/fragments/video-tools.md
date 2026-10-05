@@ -1,0 +1,1 @@
+- **`kb-video`**: `fetch`, `whisper`, `frames`, `cleanup`. Needs the `[video]` extra and `ffmpeg`.

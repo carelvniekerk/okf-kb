@@ -118,7 +118,7 @@ resource: https://arxiv.org/abs/XXXX.XXXXX   # optional: canonical URI of the un
 generated:
   by: claude-sonnet-5          # the model that wrote it
   at: '2026-08-16T21:50:00Z'   # ISO 8601 UTC
-  skill: compile@c8c310f       # producing skill @ the sha of its own last change
+  skill: compile@c8c310f       # producing skill @ the okf-kb commit it was installed from
   commit: a8c8c81              # the commit that produced this content
 # `verified` is NEVER written by an agent; see the /kb:verify skill.
 
@@ -383,9 +383,10 @@ Avoid:
 - Rule-of-three padding where two items or one would do.
 - Filler hedges: "it's worth noting", "it's important to note", "that said",
   "at its core", "in today's fast-paced world".
-- Overused vocabulary: delve, leverage, harness, unlock, seamless, robust,
-  holistic, pivotal, underscore, foster, testament to, landscape, realm,
-  tapestry, deep dive, game-changer, elevate, boasts.
+- Overused vocabulary: delve, leverage, harness, unlock, seamless, holistic,
+  pivotal, crucial, underscore, foster, showcase, testament to, landscape,
+  journey, empower, realm, tapestry, deep dive, game-changer, elevate, boasts.
+  Use robust only as the statistical term.
 - Vague authority: "studies show", "experts agree", with no specific source.
   Every claim here is traceable to `raw/`, so name the source instead.
 - Uniform sentence and paragraph length. Vary the rhythm.
@@ -445,13 +446,16 @@ Each finds this bundle by walking up for `okf.toml`, so they run from anywhere i
 - **`kb-health`**: automated health checks; writes a timestamped report to `output/` and exits non-zero on issues.
 - **`kb-provenance`**: `map`, `affected`, `classify`, `migrate`.
 - **`kb-export`**: `marp` (slide deck), `consolidate` (flatten the wiki to one file).
-- **`kb-doctor`**: report which extras are installed and what to run to add the rest. `--require <plugin>` exits non-zero when that plugin's extra is missing.
+- **`kb-doctor`**: report which extras are installed and what to run to add the rest. `--require <plugin>` exits non-zero when that plugin's extra is missing. `kb-doctor paths` prints what this bundle calls its wiki, raw and output zones; the skills run it before writing anything.
 {{INGEST_TOOLS}}{{VIDEO_TOOLS}}
 
 ## Git conventions
 
-Commit after every meaningful operation, with these prefixes:
+Commit after every meaningful operation, staging the files the operation touched rather than `git add -A`, with these prefixes:
 
+- `init:` for scaffolding or adopting the bundle
+- `ingest:` and `transcribe:` for adding raw sources
+- `note:`, `meeting:` and `brief:` for captures
 - `compile:` for integrating new sources
 - `qa:` for answering a question and filing the result
 - `lint:` for health checks and fixes
