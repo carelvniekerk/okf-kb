@@ -29,3 +29,6 @@ htmlcov/
 
 # Scratch space for manual testing against a throwaway bundle
 scratch/
+
+# claude plugin eval output
+plugins/*/evals/results/
