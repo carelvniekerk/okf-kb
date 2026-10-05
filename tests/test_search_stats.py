@@ -552,3 +552,117 @@ def test_source_zone_honours_a_renamed_raw_zone():
     assert okf.source_zone("notes/papers/x.md", "notes") == "papers"
     assert okf.source_zone("notes/papers/x.md") == ""
     assert okf.source_zone("raw/papers/x.md") == "papers"
+
+
+# -- extract-pdf keeps figures --------------------------------------------------
+#
+# Text extraction alone dropped every embedded figure without a word, while the
+# skills told the agent the figures were in raw/images/<stem>/.
+
+
+def _pdf_with_images(path: Path, sizes: list[int]) -> None:
+    import fitz  # noqa: PLC0415
+
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), "Figure 1 shows the architecture.")
+    for i, size in enumerate(sizes):
+        pix = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, size, size), False)  # noqa: FBT003
+        pix.set_rect(pix.irect, (40 * i, 120, 200))
+        top = 100 + 150 * i
+        page.insert_image(fitz.Rect(72, top, 172, top + 100), pixmap=pix)
+    doc.save(path)
+
+
+def test_extract_pdf_saves_figures_and_links_them(tmp_path, monkeypatch):
+    (tmp_path / "okf.toml").write_text("", encoding="utf-8")
+    papers = tmp_path / "raw" / "papers"
+    papers.mkdir(parents=True)
+    pdf = papers / "paper.pdf"
+    _pdf_with_images(pdf, [128])
+    monkeypatch.chdir(tmp_path)
+
+    result = CliRunner().invoke(ingest.app, ["extract-pdf", str(pdf)])
+
+    assert result.exit_code == 0, result.output
+    figures = list((tmp_path / "raw" / "images" / "paper").iterdir())
+    assert len(figures) == 1
+    md = (papers / "paper.md").read_text(encoding="utf-8")
+    assert "Figure 1 shows the architecture." in md
+    assert f"](../images/paper/{figures[0].name})" in md
+
+
+def test_extract_pdf_skips_icon_sized_images(tmp_path, monkeypatch):
+    (tmp_path / "okf.toml").write_text("", encoding="utf-8")
+    pdf = tmp_path / "raw" / "doc.pdf"
+    pdf.parent.mkdir()
+    _pdf_with_images(pdf, [16])
+    monkeypatch.chdir(tmp_path)
+
+    result = CliRunner().invoke(ingest.app, ["extract-pdf", str(pdf)])
+
+    assert result.exit_code == 0, result.output
+    assert not (tmp_path / "raw" / "images" / "doc").exists()
+    assert "![" not in (tmp_path / "raw" / "doc.md").read_text(encoding="utf-8")
+
+
+# -- clip saves the page, not a summary of it ---------------------------------
+
+
+CLIP_HTML = """\
+<html><head><title>Ignored title</title>
+<meta property="og:title" content="Paged Attention, Explained">
+<meta name="author" content="A. Writer"></head>
+<body><nav>Home | About</nav>
+<article><h1>Paged Attention</h1><p>Blocks are 16 tokens long.</p>
+<img src="/img/blocks.png" alt="blocks"><script>track()</script></article>
+<footer>Copyright</footer></body></html>
+"""
+
+
+class _Response:
+    status_code = 200
+    url = "https://example.com/posts/paged"
+    text = CLIP_HTML
+
+    def raise_for_status(self) -> None:
+        return None
+
+
+def test_clip_writes_the_article_body_with_provenance(tmp_path, monkeypatch):
+    import requests  # noqa: PLC0415
+
+    (tmp_path / "okf.toml").write_text('[paths]\nraw = "sources"\n', encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(requests, "get", lambda *_a, **_k: _Response())
+
+    result = CliRunner().invoke(
+        ingest.app,
+        ["clip", "https://example.com/posts/paged", "--no-images"],
+    )
+
+    assert result.exit_code == 0, result.output
+    out = tmp_path / "sources" / "clippings" / "paged-attention-explained.md"
+    text = out.read_text(encoding="utf-8")
+    assert "source_url: https://example.com/posts/paged" in text
+    assert "author: A. Writer" in text
+    assert "Blocks are 16 tokens long." in text
+    assert "https://example.com/img/blocks.png" in text
+    assert "Home | About" not in text
+    assert "Copyright" not in text
+    assert "track()" not in text
+
+
+def test_clip_refuses_to_overwrite(tmp_path, monkeypatch):
+    import requests  # noqa: PLC0415
+
+    (tmp_path / "okf.toml").write_text("", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(requests, "get", lambda *_a, **_k: _Response())
+    args = ["clip", "https://example.com/posts/paged", "--no-images", "--slug", "x"]
+
+    assert CliRunner().invoke(ingest.app, args).exit_code == 0
+    again = CliRunner().invoke(ingest.app, args)
+
+    assert again.exit_code == 1
+    assert "Already clipped" in again.output

@@ -1,17 +1,22 @@
 """Ingestion helpers.
 
-Download images, extract PDF text, convert HTML to markdown,
-fetch arXiv papers, and find new handwritten notes for transcription.
+Download images, extract PDF text and figures, convert HTML to markdown, clip
+web pages, fetch arXiv papers, and find new handwritten notes for transcription.
 """
 
+import datetime as _dt
 import os
 import re
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated, Any
+from urllib.parse import urljoin
 
 import typer
 
-from okf_kb import config, extras
+from okf_kb import config, extras, frontmatter
+
+if TYPE_CHECKING:
+    import fitz
 
 app = typer.Typer(help="Ingestion tools for the knowledge base.")
 
@@ -103,6 +108,63 @@ def download_images(
     typer.echo(f"Updated image references in {markdown_file}")
 
 
+#: Embedded images narrower or shorter than this, in pixels, are skipped. Logos,
+#: bullets and rule lines are embedded as images too, and a figure is never this
+#: small.
+MIN_FIGURE_PX = 64
+
+
+def _pdf_markdown(
+    doc: "fitz.Document",
+    header: list[str],
+    image_dir: Path,
+    md_dir: Path,
+) -> str:
+    """Render a PDF as markdown, saving its embedded figures beside the text.
+
+    Each page's text becomes a ``## Page N`` section, followed by a reference to
+    every figure first drawn on that page. Text extraction alone dropped every
+    figure without a word, which left papers ingested from PDF citing figures
+    the knowledge base did not have.
+
+    Args:
+        doc: An open ``fitz.Document``.
+        header: Lines to put before the first page.
+        image_dir: Where to save figures. Created only if there is one to save.
+        md_dir: Directory of the markdown file, so image links resolve from it.
+
+    Returns:
+        The markdown text.
+
+    """
+    lines = list(header)
+    seen: set[int] = set()
+    saved = 0
+    for page_num, page in enumerate(doc, 1):  # ty:ignore[invalid-argument-type]
+        text = page.get_text()
+        if text.strip():
+            lines.append(f"\n## Page {page_num}\n")
+            lines.append(text.strip())
+        figure = 0
+        for xref, *_ in page.get_images(full=True):
+            if xref in seen:
+                continue
+            seen.add(xref)
+            image = doc.extract_image(xref)
+            if not image or min(image["width"], image["height"]) < MIN_FIGURE_PX:
+                continue
+            figure += 1
+            image_dir.mkdir(parents=True, exist_ok=True)
+            path = image_dir / f"page-{page_num:03d}-{figure}.{image['ext']}"
+            path.write_bytes(image["image"])
+            saved += 1
+            rel = Path(os.path.relpath(path.resolve(), md_dir.resolve())).as_posix()
+            lines.append(f"\n![Figure {figure}, page {page_num}]({rel})")
+    if saved:
+        typer.echo(f"Saved {saved} figure(s) to {image_dir}")
+    return "\n".join(lines) + "\n"
+
+
 @app.command()
 def extract_pdf(
     pdf_file: Annotated[
@@ -115,25 +177,138 @@ def extract_pdf(
             help="Output markdown file (default: same name with .md extension).",
         ),
     ] = None,
+    image_dir: Annotated[
+        Path | None,
+        typer.Option(
+            help="Directory for embedded figures. Defaults to <raw>/images/<stem>/.",
+        ),
+    ] = None,
 ) -> None:
-    """Extract text from a PDF and save as markdown."""
+    """Extract text and figures from a PDF and save as markdown."""
     with extras.required("ingest"):
         import fitz  # pymupdf  # noqa: PLC0415
 
     if output is None:
         output = pdf_file.with_suffix(".md")
+    if image_dir is None:
+        image_dir = config.resolve_dir(None, "raw") / "images" / pdf_file.stem
 
     doc = fitz.open(pdf_file)
-    lines = [f"# {pdf_file.stem}\n"]
-
-    for page_num, page in enumerate(doc, 1):  # ty:ignore[invalid-argument-type]
-        text = page.get_text()
-        if text.strip():
-            lines.append(f"\n## Page {page_num}\n")
-            lines.append(text.strip())
-
-    output.write_text("\n".join(lines), encoding="utf-8")
+    md = _pdf_markdown(doc, [f"# {pdf_file.stem}\n"], image_dir, output.parent)
+    output.write_text(md, encoding="utf-8")
     typer.echo(f"Extracted {len(doc)} pages to {output}")
+
+
+def _slugify(text: str, max_length: int = 60) -> str:
+    """Turn a page title into a filename stem.
+
+    ``python-slugify`` belongs to the ``[video]`` extra, and a clipping must not
+    need that, so this is the small ASCII subset ``clip`` needs.
+
+    Args:
+        text: The title.
+        max_length: Longest slug to return, cut at a word boundary.
+
+    Returns:
+        Lowercase words joined by hyphens, or ``"clipping"`` if none remain.
+
+    """
+    words = re.findall(r"[a-z0-9]+", text.lower())
+    slug = ""
+    for word in words:
+        candidate = f"{slug}-{word}" if slug else word
+        if len(candidate) > max_length:
+            break
+        slug = candidate
+    return slug or "clipping"
+
+
+@app.command()
+def clip(
+    url: Annotated[str, typer.Argument(help="Web page to clip.")],
+    slug: Annotated[
+        str | None,
+        typer.Option(help="Filename stem. Defaults to one derived from the title."),
+    ] = None,
+    images: Annotated[  # noqa: FBT002
+        bool,
+        typer.Option(
+            "--images/--no-images",
+            help="Download the page's images to <raw>/images/<slug>/.",
+        ),
+    ] = True,
+) -> None:
+    """Save a web page as markdown in <raw>/clippings/, verbatim.
+
+    The page body is converted, not summarised: a clipping is a source, and
+    every claim compiled from it is later verified against it. Navigation,
+    headers, footers, scripts and forms are dropped. Relative image links are
+    made absolute so they can be downloaded.
+
+    Raises:
+        typer.Exit: With code 1 when the page cannot be fetched or the clipping
+            already exists.
+
+    """
+    with extras.required("ingest"):
+        import requests  # noqa: PLC0415
+        from bs4 import BeautifulSoup  # noqa: PLC0415
+        from markdownify import markdownify  # noqa: PLC0415
+
+    try:
+        resp = requests.get(
+            url,
+            timeout=60,
+            headers={"User-Agent": "knowledge-base-ingest/0.1"},
+        )
+        resp.raise_for_status()
+    except requests.RequestException as e:
+        typer.echo(f"[ERROR] Could not fetch {url}: {e}", err=True)
+        raise typer.Exit(1) from e
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+    og_title = soup.find("meta", attrs={"property": "og:title"})
+    title = (
+        str(og_title.get("content", "")).strip()
+        if og_title is not None
+        else (soup.title.get_text(strip=True) if soup.title else "")
+    ) or url
+    author_tag = soup.find("meta", attrs={"name": "author"})
+    author = str(author_tag.get("content", "")).strip() if author_tag else ""
+
+    body = soup.find("article") or soup.find("main") or soup.body or soup
+    for tag in body.find_all(
+        ["script", "style", "nav", "header", "footer", "aside", "form"],
+    ):
+        tag.decompose()
+    for img in body.find_all("img"):
+        src = str(img.get("src", ""))
+        if src and not src.startswith("data:"):
+            img["src"] = urljoin(resp.url, src)
+
+    md = markdownify(str(body), heading_style="ATX")
+    md = re.sub(r"\n{3,}", "\n\n", md).strip()
+
+    clippings = config.resolve_dir(None, "raw") / "clippings"
+    clippings.mkdir(parents=True, exist_ok=True)
+    output = clippings / f"{slug or _slugify(title)}.md"
+    if output.exists():
+        typer.echo(f"Already clipped: {output}", err=True)
+        raise typer.Exit(1)
+
+    meta: dict[str, Any] = {
+        "type": "clipping",
+        "title": title,
+        "source_url": resp.url,
+        "fetched": _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    if author:
+        meta["author"] = author
+    output.write_text(frontmatter.dumps(meta, f"# {title}\n\n{md}\n"), encoding="utf-8")
+    typer.echo(f"Saved clipping: {output}")
+
+    if images:
+        download_images(markdown_file=output, image_dir=None)
 
 
 @app.command()
@@ -309,16 +484,12 @@ def arxiv(  # noqa: C901, PLR0912, PLR0915
             import fitz  # noqa: PLC0415
 
         doc = fitz.open(pdf_output)
-        lines = [f"# arXiv: {arxiv_id}\n\n"]
-        lines.append(f"Source: https://arxiv.org/abs/{arxiv_id}\n\n---\n")
-
-        for page_num, page in enumerate(doc, 1):  # ty:ignore[invalid-argument-type]
-            text = page.get_text()
-            if text.strip():
-                lines.append(f"\n## Page {page_num}\n")
-                lines.append(text.strip())
-
-        md_output.write_text("\n".join(lines), encoding="utf-8")
+        header = [
+            f"# arXiv: {arxiv_id}\n\n",
+            f"Source: https://arxiv.org/abs/{arxiv_id}\n\n---\n",
+        ]
+        md = _pdf_markdown(doc, header, paper_image_dir, md_output.parent)
+        md_output.write_text(md, encoding="utf-8")
         typer.echo(f"Extracted PDF to markdown: {md_output}")
     except extras.MissingExtraError as e:
         # Only reachable on a half-installed extra: requests comes from the
@@ -350,7 +521,8 @@ def list_untranscribed(
     if not handwritten_dir.exists():
         typer.echo(f"Handwritten directory not found: {handwritten_dir}")
         typer.echo(
-            "Create a symlink: ln -s /path/to/samsung/notes/exports raw/handwritten",
+            "Put scans or exports of handwritten notes there, or symlink the "
+            f"folder your note app exports to: ln -s <export-dir> {handwritten_dir}",
         )
         return
 
