@@ -99,6 +99,25 @@ ever describe one machine. The `uv-lock` pre-commit hook still runs; it fails
 the commit when `pyproject.toml` stops resolving, which for a package other
 repos install from git is the failure worth catching early.
 
+### Skill evals
+
+`plugins/kb-query/evals/` holds the `wiki` skill's `claude plugin eval` suite:
+cases tagged `trigger`, `near-miss` and `ambiguous`. Every run is a billed
+model call, about cases × runs × 2 arms plus the judge, so agree a ceiling
+first. Run it on Opus and again on Haiku, because Haiku shows whether the
+description and body are sufficient:
+
+```bash
+claude plugin eval plugins/kb-query --no-publish --max-cost-usd 5 --runs 1 --tag trigger --tag near-miss
+claude plugin eval plugins/kb-query --no-publish --max-cost-usd 10 --model haiku
+```
+
+The eval workspace starts no `kb-mcp` server, so these cases measure
+triggering and whether Claude admits it cannot reach the notes, not retrieval.
+The `kb` plugin has no suite: the eval sandbox cannot read `~/.local/bin`, so
+no `kb-*` tool runs inside it. Test those skills against a bundle in
+`scratch/` instead.
+
 ## Extras
 
 Heavy, platform-sensitive dependencies are opt-in:
