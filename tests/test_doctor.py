@@ -203,3 +203,51 @@ def test_bundles_with_a_broken_declaration_is_an_error(scope, tmp_path):
 
     assert result.exit_code == 1
     assert "holds no okf.toml" in result.output
+
+
+# -- paths ------------------------------------------------------------------------
+#
+# Every writing skill runs `kb-doctor paths` before it touches a file, because a
+# bundle adopted from an existing folder keeps its own zone names. Skills that
+# assumed `raw/` diffed an empty directory and reported nothing to compile.
+
+
+def test_paths_reports_the_defaults(tmp_path, monkeypatch):
+    (tmp_path / "okf.toml").write_text("", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(doctor.app, ["paths", "--json-output"])
+
+    assert result.exit_code == 0
+    assert json.loads(result.output) == {
+        "root": str(tmp_path.resolve()),
+        "wiki": "wiki",
+        "raw": "raw",
+        "output": "output",
+        "log": "wiki/log.md",
+    }
+
+
+def test_paths_follows_renamed_zones_from_a_nested_directory(tmp_path, monkeypatch):
+    (tmp_path / "okf.toml").write_text(
+        '[paths]\nwiki = "articles"\nraw = "notes"\n',
+        encoding="utf-8",
+    )
+    nested = tmp_path / "notes" / "papers"
+    nested.mkdir(parents=True)
+    monkeypatch.chdir(nested)
+
+    payload = json.loads(runner.invoke(doctor.app, ["paths", "--json-output"]).output)
+
+    assert payload["wiki"] == "articles"
+    assert payload["raw"] == "notes"
+    assert payload["log"] == "articles/log.md"
+
+
+def test_paths_outside_a_bundle_is_an_error(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(doctor.app, ["paths"])
+
+    assert result.exit_code == 1
+    assert "no okf.toml found" in result.output

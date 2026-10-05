@@ -8,7 +8,8 @@ user is already mid-task.
 ``kb-doctor`` is the probe that answers it up front: what is installed, what a
 given plugin needs, and the one command that closes the gap. ``kb-doctor
 bundles`` answers the other question a skill needs settled before it starts:
-which knowledge bases are in scope from where it is standing.
+which knowledge bases are in scope from where it is standing. ``kb-doctor
+paths`` answers the one a writing skill needs: what this bundle calls its zones.
 """
 
 from __future__ import annotations
@@ -16,12 +17,15 @@ from __future__ import annotations
 import json
 import shutil
 from dataclasses import asdict, dataclass, field
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
 
 from okf_kb import config, extras
 from okf_kb.frontmatter import is_article
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 app = typer.Typer(help="Check the okf-kb install and report what is missing.")
 
@@ -311,3 +315,64 @@ def bundles(
             f"{mark} {state['name']:<{width}}  {state['path']}  "
             f"({state['source']}, {state['articles']} articles)",
         )
+
+
+def paths_report(start: Path | None = None) -> dict[str, str]:
+    """Describe where the enclosing bundle keeps each zone.
+
+    Skills write into these directories, so they must not assume ``wiki/`` and
+    ``raw/``: a bundle adopted from an existing folder keeps its own names.
+
+    Args:
+        start: Directory to discover from. Defaults to the working directory.
+
+    Returns:
+        ``root`` as an absolute path, then ``wiki``, ``raw``, ``output`` and
+        ``log`` relative to it, in the form a skill uses in commands it runs
+        from the root.
+
+    Raises:
+        ConfigError: If no bundle encloses ``start``, or its config is invalid.
+
+    """
+    cfg = config.load(start)
+    return {
+        "root": str(cfg.root),
+        "wiki": cfg.relative(cfg.wiki).as_posix(),
+        "raw": cfg.relative(cfg.raw).as_posix(),
+        "output": cfg.relative(cfg.output).as_posix(),
+        "log": cfg.relative(cfg.wiki / "log.md").as_posix(),
+    }
+
+
+@app.command()
+def paths(
+    json_output: Annotated[  # noqa: FBT002
+        bool,
+        typer.Option("--json-output", help="Emit the paths as JSON."),
+    ] = False,
+) -> None:
+    """Print where the enclosing bundle keeps its wiki, raw and output zones.
+
+    Discovery walks up from the working directory, as every writing command
+    does, so this reports the bundle a skill is about to write into and never
+    one reached through a pointer file.
+
+    Args:
+        json_output: Emit the paths as JSON.
+
+    Raises:
+        typer.Exit: With code 1 when no bundle encloses the working directory.
+
+    """
+    try:
+        payload = paths_report()
+    except config.ConfigError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
+    if json_output:
+        typer.echo(json.dumps(payload, indent=2))
+        return
+    for key, value in payload.items():
+        typer.echo(f"{key:<7} {value}")
