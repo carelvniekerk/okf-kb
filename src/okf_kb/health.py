@@ -496,7 +496,7 @@ def main(
         "",
         "Derived from `verified`, not asserted. An unverified article is not a",
         "defect; it simply has not been read back against its sources by a human.",
-        "Use `/verify` to record a sign-off.",
+        "Use `/kb:verify` to record a sign-off.",
         "",
         f"- unverified: {tiers['unverified']}",
         f"- machine-confirmed: {tiers['machine-confirmed']}",
