@@ -66,8 +66,7 @@ Ask only when the answer is not obvious:
 
 If `kb-capture` is enabled, also ask whether to wire the daily brief to their calendars and mail.
 For a yes, collect one entry per calendar (label, `google` or `microsoft`, and the calendar id for Google) and one per mailbox (label, `gmail` or `outlook`).
-Say that the same calendars let `/kb-capture:capture meeting granola` recover a meeting's invitee list, so the answer is not weighed against the brief alone.
-Do not ask for a Granola folder id: the table is optional and the id comes only from Granola's `list_meeting_folders`.
+Say that the same calendars let `/kb-capture:meeting` and `/kb-capture:capture meeting` fill in a meeting's title and invitee list, so the answer is not weighed against the brief alone.
 If they would rather wait, leave the `[capture]` block commented out.
 
 Never invent a calendar id, an email address or an employer.

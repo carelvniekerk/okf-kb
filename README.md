@@ -43,7 +43,7 @@ Day to day the loop is short:
 /kb-ingest:ingest 2402.12345         # a paper, a URL, a PDF → raw/
 /kb-video:video <youtube-url>        # a talk → transcript + frames → raw/
 /kb-capture:capture note             # something you said out loud → raw/
-/kb-capture:capture meeting granola  # a Granola transcript + its calendar event → raw/
+/kb-capture:capture meeting          # notes or a recap + its calendar event → raw/
 
 /kb:compile                          # integrate everything new into wiki/
 ```
@@ -180,19 +180,11 @@ skill is a copy, so re-upload it when `SKILL.md` changes.
 | `kb-query` | `wiki` | core install; read-only; ships the `okf-kb` MCP server |
 | `kb-ingest` | `ingest`, `transcribe` | `[ingest]` extra |
 | `kb-video` | `video` | `[video]` extra + `ffmpeg` |
-| `kb-capture` | `capture`, `meeting`, `update-brief` | core install + calendar/mail connectors; ships the Granola MCP |
+| `kb-capture` | `capture`, `meeting`, `update-brief` | core install + calendar/mail connectors |
 
 `kb` is the only one you need. The rest are separate because their extras are
 heavy — `[video]` pulls torch — and because not every knowledge base wants a
 daily brief wired to a calendar.
-
-`kb-capture` bundles the [Granola](https://granola.ai) MCP server in its own
-`.mcp.json`, so enabling the plugin is all it takes to make
-`/kb-capture:capture meeting granola` available — run `/mcp`, pick `granola`,
-and authenticate once. Everything else in the plugin works without it, and a
-Granola account that is not connected is reported as a skip rather than an
-error. Transcript access is a paid Granola tier; on the free tier the import
-falls back to the meeting summary.
 
 Skills are addressed by the plugin that ships them: `/kb:compile`,
 `/kb-video:video`, `/kb-capture:capture`.

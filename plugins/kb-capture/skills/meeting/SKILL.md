@@ -2,35 +2,41 @@
 name: meeting
 description: >
   Start a blank meeting note in raw/meetings/ to fill in live during a meeting,
-  with today's date, the current time and the attendees filled in, and open it in
-  VS Code. Use when the user asks to start a meeting note for a meeting that is
-  happening now. A meeting that already happened belongs to /kb-capture:capture
-  meeting.
+  with the title, date, time and attendees taken from the matching Google or
+  Microsoft 365 calendar event, and open it in VS Code. Use when the user asks
+  to start or scaffold a meeting note, for a meeting happening now, just ended
+  or on a named day, such as "a meeting for client X from just now". Notes or a
+  recap of a meeting that already happened belong to /kb-capture:capture meeting.
 disable-model-invocation: true
-allowed-tools: Read Write Bash(kb-doctor paths) Bash(date *) Bash(code *)
-argument-hint: <meeting title (optional)>
+allowed-tools: Read Write Bash(kb-doctor paths) Bash(date *) Bash(code *) mcp__claude_ai_Google_Calendar__list_events mcp__claude_ai_Microsoft_365__outlook_calendar_search
+argument-hint: "<client, title or topic, and when: now, yesterday, a date (all optional)>"
 ---
 
 # Meeting
 
 Write a blank, structured meeting note to fill in live, and open it.
-$ARGUMENTS, if given, is the meeting title.
+$ARGUMENTS is free text that may hold the client or meeting title and a time, such as `client X from yesterday`.
 
 The note is deliberately left uncommitted, because it changes throughout the meeting.
 `/kb:compile` asks before it includes an uncommitted file, so a compile run mid-meeting does not pick it up silently.
-For a meeting that already happened, `/kb-capture:capture meeting` structures notes or a recap, and `/kb-capture:capture meeting granola` builds the note from a Granola recording and the calendar event.
+For notes or a recap of a meeting that already happened, `/kb-capture:capture meeting` structures them into the note.
 
 ## Workflow
 
 1. Run `kb-doctor paths` and take `<raw>` from its `raw` value.
-2. Get the title from $ARGUMENTS, or ask "Meeting title?" and wait.
-3. Ask "Attendees (comma-separated, or `skip` to fill in later)?" and wait.
-4. Take the date and time from `date +%Y-%m-%d` and `date +%H:%M`, without asking.
-5. Pick a short kebab-case slug of at most five words.
-   The path is `<raw>/meetings/YYYY-MM-DD-<slug>.md`, and if it exists, append `-2`, `-3` and so on.
-6. Write the scaffold below.
-   With `skip`, write `attendees: []` and replace the bullets under `## 👥 Attendees` with `<!-- add as people join -->`.
-7. Run `code "<absolute path>"`, then print the absolute path in one line so the user can also open it elsewhere.
+   Take today's date and time from `date +%Y-%m-%d` and `date +%H:%M`, without asking.
+2. Look the meeting up on the calendars, before asking the user anything.
+   Read `${CLAUDE_PLUGIN_ROOT}/references/external-context.md` and follow "Finding one meeting", with the client, title or topic words and the time from $ARGUMENTS.
+   Do this on every run, including when $ARGUMENTS names only a client.
+3. With a matched event, take the title, the date and start time, and the attendees from it.
+   Do not ask for the title or the attendees.
+   Without a match, get the title from $ARGUMENTS or ask "Meeting title?", then ask "Attendees (comma-separated, or `skip` to fill in later)?", and wait for each.
+4. Pick a short kebab-case slug of at most five words.
+   The path is `<raw>/meetings/YYYY-MM-DD-<slug>.md` with the meeting's date, and if it exists, append `-2`, `-3` and so on.
+5. Write the scaffold below.
+   With `skip`, or an event that lists no attendees, write `attendees: []` and replace the bullets under `## 👥 Attendees` with `<!-- add as people join -->`.
+   With a matched event, add `- Calendar event from <calendar name>, YYYY-MM-DD HH:MM.` under `## Sources`.
+6. Run `code "<absolute path>"`, then print the absolute path, the event title and the attendee list in a few lines, so the user can correct either.
    Do not commit and do not offer to compile.
 
 ```markdown

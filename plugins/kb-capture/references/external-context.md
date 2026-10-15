@@ -1,13 +1,14 @@
 # Calendars and mailboxes
 
 How the kb-capture skills fetch calendar events and mail.
-`/kb-capture:capture brief` and `/kb-capture:update-brief` use all of it, and `/kb-capture:capture meeting` uses the calendar part to match a meeting to its event.
+`/kb-capture:capture brief` and `/kb-capture:update-brief` use all of it, and `/kb-capture:meeting` and `/kb-capture:capture meeting` use the calendar part to find a meeting's event.
 Which accounts to read is configured per bundle in the `[capture]` table of `okf.toml`, and nothing about them is built into the skills.
 
 ## Contents
 
 - The configuration
 - Calendars
+- Finding one meeting
 - Rendering events
 - Mailboxes
 - Failures
@@ -33,9 +34,6 @@ id = "you@example.com"              # google only; omit for microsoft
 name = "Gmail"                      # tag shown against each inbox line
 provider = "gmail"                  # gmail | outlook
 # folder = "Inbox"                  # outlook only
-
-[capture.granola]                   # optional
-# folder_id = "…"
 ```
 
 ## Calendars
@@ -50,6 +48,28 @@ Fan out with one call per configured calendar, in parallel, then merge by start 
 Where an entry sets `drop_subject_prefix`, discard every event whose subject starts with one of its values.
 It takes a list of strings, and a bare string counts as a one-element list.
 Recurring standups are noise: they never appear in a brief, not even as the first meeting of the day, and a refresh that brings them back is a regression.
+
+## Finding one meeting
+
+`/kb-capture:meeting` and `/kb-capture:capture meeting` look the meeting up on the calendars before they ask the user anything.
+The user should never have to ask for the lookup, so run it whenever the request names a client, a topic or a time, such as "a meeting for client X from yesterday" or "from just now".
+
+1. Work out the window from the request, in the `timezone` from `[capture]` or the machine's:
+   "just now", "now" or no time given means events that started in the last three hours or are still running,
+   "yesterday", a weekday or a date means that whole day.
+2. Query the Google and Microsoft 365 calendar connectors in parallel for the window, using the call shapes under Calendars.
+   Use the calendars `[capture]` declares.
+   If it declares none, or no `[capture]` table exists, still try both connectors against their default calendar (`calendarId: "primary"` for Google, no `calendarId` for Microsoft 365), because the user asked for the lookup explicitly.
+3. Merge the results, drop duplicates, and keep the events whose title, organiser or attendee names or email domains contain the client or topic words from the request.
+   Filter locally, because the connectors are called with a wide query.
+   With no client or topic words, keep every event in the window.
+4. With one match, adopt it without asking.
+   With several, list them numbered (`HH:MM: <title> (<n> attendees)`) and ask which.
+   With none, say so in one line and fall back to asking the user for the title and attendees.
+5. From the adopted event take the subject as the title, the start and end time, the full invitee list with each person's name, the organiser, and the location.
+   Never invent a name that the event does not list.
+
+A connector that fails or is not authenticated counts as a skip under Failures, and the other calendar still decides the match.
 
 ## Rendering events
 
