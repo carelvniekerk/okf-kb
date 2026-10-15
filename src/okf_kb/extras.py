@@ -33,7 +33,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Final
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Mapping
+    from collections.abc import Generator, Mapping
 
 #: Where a released install comes from. The package is not on PyPI.
 GIT_SOURCE = "git+ssh://git@github.com/carelvniekerk/okf-kb"
@@ -137,7 +137,7 @@ def installed_extras() -> list[str]:
 
 
 @contextmanager
-def required(extra: str) -> Iterator[None]:
+def required(extra: str) -> Generator[None]:
     """Translate a failed optional import into an actionable error.
 
     Wraps an ``import`` of a dependency provided by ``extra``, so that a missing
@@ -201,7 +201,7 @@ def missing_modules(extra: str) -> list[str]:
     for module in EXTRA_MODULES[extra]:
         try:
             spec = importlib.util.find_spec(module)
-        except (ImportError, ValueError):
+        except ImportError, ValueError:
             spec = None
         if spec is None:
             missing.append(module)

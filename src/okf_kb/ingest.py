@@ -4,7 +4,7 @@ Download images, extract PDF text and figures, convert HTML to markdown, clip
 web pages, fetch arXiv papers, and find new handwritten notes for transcription.
 """
 
-import datetime as _dt
+import datetime as dt
 import os
 import re
 from pathlib import Path
@@ -115,7 +115,7 @@ MIN_FIGURE_PX = 64
 
 
 def _pdf_markdown(
-    doc: "fitz.Document",
+    doc: fitz.Document,
     header: list[str],
     image_dir: Path,
     md_dir: Path,
@@ -300,7 +300,7 @@ def clip(
         "type": "clipping",
         "title": title,
         "source_url": resp.url,
-        "fetched": _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "fetched": dt.datetime.now(dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     if author:
         meta["author"] = author

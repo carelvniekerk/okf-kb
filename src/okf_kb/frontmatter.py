@@ -16,7 +16,7 @@ survive a rewrite belongs in a key, not a comment.
 
 from __future__ import annotations
 
-import datetime as _dt
+import datetime as dt
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -275,7 +275,7 @@ def save(document: Document, path: Path | None = None) -> None:
     target.write_text(document.to_text(), encoding="utf-8")
 
 
-def as_date(value: Any) -> _dt.date | None:  # noqa: ANN401
+def as_date(value: Any) -> dt.date | None:  # noqa: ANN401
     """Coerce a frontmatter value to a date.
 
     YAML parses bare ``YYYY-MM-DD`` into ``datetime.date`` but quoted values
@@ -289,13 +289,13 @@ def as_date(value: Any) -> _dt.date | None:  # noqa: ANN401
         recognisable date.
 
     """
-    if isinstance(value, _dt.datetime):
+    if isinstance(value, dt.datetime):
         return value.date()
-    if isinstance(value, _dt.date):
+    if isinstance(value, dt.date):
         return value
     if isinstance(value, str):
         try:
-            return _dt.date.fromisoformat(value.strip())
+            return dt.date.fromisoformat(value.strip())
         except ValueError:
             return None
     return None

@@ -23,7 +23,7 @@ the ``okf_version`` / ``kb_format`` block and the subdirectory indexes get none.
 
 from __future__ import annotations
 
-import datetime as _dt
+import datetime as dt
 import re
 from dataclasses import dataclass, field
 
@@ -304,7 +304,7 @@ class Article:
         return declared.strip() if isinstance(declared, str) else ""
 
     @property
-    def date_added(self) -> _dt.date | None:
+    def date_added(self) -> dt.date | None:
         """The date the article entered the wiki, if declared."""
         return fm.as_date(self.frontmatter.get("date_added"))
 
@@ -335,9 +335,9 @@ class Article:
         return trust_tier(self.frontmatter)
 
     @property
-    def sort_key(self) -> tuple[_dt.date, str]:
+    def sort_key(self) -> tuple[dt.date, str]:
         """Sort oldest first, then by filename, matching the curated order."""
-        return (self.date_added or _dt.date.min, self.path.name)
+        return (self.date_added or dt.date.min, self.path.name)
 
 
 @dataclass
@@ -512,12 +512,12 @@ def _build_node(path: Path, wiki_dir: Path) -> DirNode:
     return node
 
 
-def _child_sort_key(node: DirNode) -> tuple[_dt.date, str]:
+def _child_sort_key(node: DirNode) -> tuple[dt.date, str]:
     """Order sibling directories by their earliest article, then by name."""
     dates = [
         article.date_added for article in node.all_articles() if article.date_added
     ]
-    return (min(dates) if dates else _dt.date.max, node.name)
+    return (min(dates) if dates else dt.date.max, node.name)
 
 
 def unique_sources(articles: list[Article]) -> list[str]:
@@ -666,7 +666,7 @@ def _render_node_body(
 def _header_badges(
     article_count: int,
     source_count: int,
-    compiled: _dt.date,
+    compiled: dt.date,
     *,
     health_passing: bool,
 ) -> list[str]:
@@ -726,7 +726,7 @@ def _grouped(
 
 def render_root_index(
     root: DirNode,
-    compiled: _dt.date,
+    compiled: dt.date,
     *,
     health_passing: bool = False,
     cfg: config.Config | None = None,
@@ -779,7 +779,7 @@ def render_root_index(
     return fm.dumps(_root_frontmatter(cfg), "\n" + text)
 
 
-def read_compiled(wiki_dir: Path) -> _dt.date | None:
+def read_compiled(wiki_dir: Path) -> dt.date | None:
     """Recover the compile date already stamped into the root index.
 
     The badge records when the wiki was last *compiled*, not when ``kb-index``
@@ -801,14 +801,14 @@ def read_compiled(wiki_dir: Path) -> _dt.date | None:
     if match is None:
         return None
     try:
-        return _dt.date(int(match[1]), int(match[2]), int(match[3]))
+        return dt.date(int(match[1]), int(match[2]), int(match[3]))
     except ValueError:
         return None
 
 
 def build_indexes(
     wiki_dir: Path,
-    compiled: _dt.date | None = None,
+    compiled: dt.date | None = None,
     *,
     health_passing: bool = False,
     cfg: config.Config | None = None,
@@ -838,7 +838,7 @@ def build_indexes(
     _, _, titles = _taxonomy(cfg)
 
     root = build_tree(wiki_dir)
-    stamp = compiled or read_compiled(wiki_dir) or _dt.date.today()  # noqa: DTZ011
+    stamp = compiled or read_compiled(wiki_dir) or dt.date.today()  # noqa: DTZ011
 
     rendered: dict[Path, str] = {
         wiki_dir / INDEX_FILENAME: render_root_index(
@@ -920,7 +920,7 @@ def write_indexes(rendered: dict[Path, str]) -> list[Path]:
     return written
 
 
-def _parse_compiled(value: str | None) -> _dt.date | None:
+def _parse_compiled(value: str | None) -> dt.date | None:
     """Parse the ``--compiled`` option.
 
     Args:
@@ -936,7 +936,7 @@ def _parse_compiled(value: str | None) -> _dt.date | None:
     if value is None:
         return None
     try:
-        return _dt.date.fromisoformat(value)
+        return dt.date.fromisoformat(value)
     except ValueError as exc:
         msg = f"expected YYYY-MM-DD, got {value!r}"
         raise typer.BadParameter(msg) from exc
@@ -993,7 +993,7 @@ def main(
         msg = "pass either --compiled or --stamp-compiled, not both"
         raise typer.BadParameter(msg)
 
-    stamp = _dt.date.today() if stamp_compiled else _parse_compiled(compiled)  # noqa: DTZ011
+    stamp = dt.date.today() if stamp_compiled else _parse_compiled(compiled)  # noqa: DTZ011
     rendered = build_indexes(
         config.resolve_dir(wiki_dir, "wiki"),
         stamp,
