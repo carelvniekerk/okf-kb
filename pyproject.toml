@@ -3,7 +3,7 @@ name = "okf-kb"
 version = "0.1.0"
 description = "Tooling for agent-maintained Open Knowledge Format knowledge bases"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
     "mcp>=2.2",
     "pydantic>=2",
@@ -51,7 +51,7 @@ dev = ["okf-kb[ingest,video]", "pytest>=8.3"]
 all = ["okf-kb[ingest,video]"]
 
 [build-system]
-requires = ["uv_build>=0.12.1,<0.13.0"]
+requires = ["uv_build>=0.13.1,<0.14.0"]
 build-backend = "uv_build"
 
 # Whether yt-dlp, mlx-whisper and slugify resolve depends on which extras the
