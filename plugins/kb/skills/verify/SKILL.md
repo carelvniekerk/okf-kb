@@ -44,12 +44,16 @@ When unsure whether the user really reviewed the content, ask.
 
 ## 1. Load the article and its sources
 
-Run `kb-doctor paths`, then read the article and every path in its `sources[].resource`.
+Run `kb-doctor paths`, then read the article and list every path in its `sources[].resource`.
 If a source is missing from disk, stop and report it, because an article cannot be verified against a source that is gone.
+Do not read the sources yourself.
+`kb:source-reviewer` reads them in a fresh context, which keeps their text out of this conversation and keeps the comparison free of whatever compiled the article.
 For a directory, work through it one article at a time, with a separate confirmation for each.
 
 ## 2. Present the comparison
 
+Spawn `kb:source-reviewer` with the article's path and the source paths from step 1, and ask for its findings with quoted passages.
+Check any `definite` finding against the source yourself before you relay it, because a reviewer can misread.
 Show the user, per source, what the article claims and where each claim comes from.
 Lead with the problems:
 
