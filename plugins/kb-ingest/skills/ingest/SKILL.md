@@ -4,11 +4,11 @@ description: >
   Add a source to the knowledge base's raw zone. Fetches arXiv papers, converts
   local PDFs with their figures, clips web pages verbatim and localises images,
   then logs, commits and offers to compile. Use when the user gives an arXiv id,
-  a URL, a PDF path or a file already in raw/ and wants it added to the knowledge
+  a URL, a PDF path or a file already in the raw zone and wants it added to the knowledge
   base. YouTube videos belong to /kb-video:video.
 disable-model-invocation: true
 allowed-tools: Read Edit Bash(kb-ingest *) Bash(kb-doctor) Bash(kb-doctor *) Bash(git add *) Bash(git commit *) Bash(date *)
-argument-hint: <arXiv id, URL, PDF path, or a file in raw/>
+argument-hint: <arXiv id, URL, PDF path, or a file in the raw zone>
 ---
 
 # Ingest

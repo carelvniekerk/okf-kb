@@ -1,7 +1,7 @@
 ---
 name: meeting
 description: >
-  Start a blank meeting note in raw/meetings/ to fill in live during a meeting,
+  Start a blank meeting note in the raw zone's meetings folder to fill in live,
   with the title, date, time and attendees taken from the matching Google or
   Microsoft 365 calendar event, and open it in VS Code. Use when the user asks
   to start or scaffold a meeting note, for a meeting happening now, just ended

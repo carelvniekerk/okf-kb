@@ -1,9 +1,9 @@
 ---
 name: transcribe
 description: >
-  Transcribe handwritten notes in raw/handwritten/ that have no transcription yet
-  into clean structured markdown in raw/transcriptions/, without touching the
-  originals. Use when the user says "transcribe my handwritten notes" or "process
+  Transcribe handwritten notes in the raw zone's handwritten folder that have no
+  transcription yet into clean structured markdown in its transcriptions folder,
+  without touching the originals. Use when the user says "transcribe my handwritten notes" or "process
   handwritten".
 disable-model-invocation: true
 allowed-tools: Read Write Bash(kb-ingest list-untranscribed) Bash(kb-doctor paths) Bash(git add *) Bash(git commit *)

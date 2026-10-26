@@ -3,7 +3,7 @@ name: video
 description: >
   Turn a YouTube video into a knowledge base source. Stages the video's metadata,
   captions, audio and frames, judges the transcript and falls back to MLX Whisper
-  when the captions are poor, then writes a structured article to raw/videos/ with
+  when the captions are poor, then writes a structured article to the raw zone with
   selected frames and keeps the verbatim transcript beside it. Does not commit,
   because /kb:compile integrates it. Use when the user gives a YouTube URL or says
   "ingest this video" or "transcribe this video".
