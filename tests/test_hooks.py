@@ -166,3 +166,16 @@ def test_the_config_runs_the_guard_on_markdown_edits_and_writes():
 def test_the_guard_is_executable():
     """A non-executable script fails to start, which leaves the guard off."""
     assert os.access(GUARD, os.X_OK)
+
+
+def test_swapping_one_signer_for_another_asks(signed):
+    assert decide("Edit", _edit(signed, "by: human:carel", "by: human:anna")) == "ask"
+
+
+def test_a_quoted_key_sign_off_asks(plain):
+    entry = 'verified:\n  - { "by": "human:carel", "at": "2026-10-05" }\n'
+    assert decide("Edit", _edit(plain, "date_updated", entry + "date_updated")) == "ask"
+
+
+def test_removing_a_sign_off_is_allowed(signed):
+    assert decide("Edit", _edit(signed, FLOW_ENTRY, "")) == "allow"

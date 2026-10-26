@@ -8,19 +8,24 @@
 A `verified` entry with a `human:` actor claims that a named person read the
 article against its sources. /kb:verify asks for that confirmation in the
 conversation, but a skill is prose that Claude may skip, so this PreToolUse
-hook returns "ask" whenever an edit would add such an entry. Any failure to
-read the input or the file also returns "ask", so a broken guard prompts
-rather than allowing silently.
+hook returns "ask" whenever an edit would add such an entry. Unreadable input
+or an unreadable file also returns "ask", so bad input prompts rather than
+allowing silently. A missing `uv`, a non-executable script or the hook timeout
+are non-blocking errors in Claude Code, and the edit goes through in those
+cases.
 """
 
 import json
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
-#: A verified entry's actor, in flow (`{ by: human:x }`) or block style.
-HUMAN_ACTOR = re.compile(r"""\bby:\s*["']?human:""")
+#: A verified entry's human actor id, in flow (`{ by: human:x }`), block or
+#: quoted-key (`{ "by": "human:x" }`) style. The id is captured so that
+#: swapping one signer for another counts as adding a sign-off.
+HUMAN_ACTOR = re.compile(r"""\bby["']?\s*:\s*["']?(human:[^\s,"'}]+)""")
 
 
 def frontmatter(text: str) -> str:
@@ -91,10 +96,10 @@ def main() -> None:
             "Approve only if it adds no human: entry under verified.",
         )
         return
-    added = len(HUMAN_ACTOR.findall(frontmatter(after))) - len(
+    added = Counter(HUMAN_ACTOR.findall(frontmatter(after))) - Counter(
         HUMAN_ACTOR.findall(frontmatter(before)),
     )
-    if added > 0:
+    if added:
         ask(
             f"This edit adds a human sign-off to {path.name}. Approve only if "
             "that person read the article against its sources and confirmed it.",
