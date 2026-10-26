@@ -121,14 +121,21 @@ kb-provenance migrate
 ```
 
 It lists articles that declare no provenance, with any `## Sources` links in their bodies, and modifies nothing.
-Write the frontmatter the bundle template's `CLAUDE.md` describes, and take care with two fields.
+Then let the tool write the provenance it can derive from git history:
 
-`generated`: recover it from git rather than stamping now.
-The creation commit's author trailer gives the producing model, its date gives `at`, and its subject prefix names the skill.
-Where history cannot say, because the file predates the repository or its commit has no trailer, leave `by` out.
+```bash
+kb-provenance migrate --write
+```
+
+For each article not yet in the OKF shape it converts a legacy `source_files` list into `sources`, and stamps `generated` from the creation commit (its date, its model trailer and its commit).
+It leaves out whatever history cannot support, so an article with no history gets no `generated` block and a source whose creation commit names no model gets no `author`, and it names every article it could not stamp.
+It never writes `verified` and never changes a body.
+Read `git diff` before going on, and report the articles without `generated` in the handover.
 An absent field is honest, and a fabricated one poisons the trust signal.
 
-`sources`: convert the links in a `## Sources` section into the provenance array.
+Then write the remaining frontmatter the bundle template's `CLAUDE.md` describes, such as `type`, `title` and `description`.
+
+`sources`: for an article the tool did not convert, because it has no `source_files` list, turn the links in its `## Sources` section into the provenance array.
 Where there is no such section and the origin is not recoverable, leave `sources` out and report it in the handover.
 `kb-health` still requires a `## Sources` section in every article, so add one that states the absence instead of faking a citation:
 

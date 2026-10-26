@@ -58,3 +58,11 @@ repos:
             entry: uvx ty check
             pass_filenames: false
             types: [python]
+
+          # Check the module boundaries declared in pyproject.toml
+          - id: lint-imports
+            name: lint-imports
+            language: system
+            entry: uv run lint-imports
+            pass_filenames: false
+            types: [python]

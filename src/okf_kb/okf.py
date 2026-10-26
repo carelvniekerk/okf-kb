@@ -60,24 +60,6 @@ KEY_ORDER: tuple[str, ...] = (
     "arxiv",
 )
 
-#: Which actor authored the material in each `raw/` subdirectory. Git author is
-#: useless here because every file is committed by the repository owner
-#: regardless of who or what wrote it, so the directory's role is the signal.
-_AUTHOR_BY_ZONE: dict[str, str] = {
-    "notes": "human:carel",
-    "meetings": "human:carel",
-    "handwritten": "human:carel",
-    # Fetched rather than authored: the intellectual author is the upstream
-    # paper's, which this field does not attempt to capture.
-    "papers": "process:kb-ingest",
-    "clippings": "process:kb-ingest",
-}
-
-#: Zones whose contents an agent wrote, so the producing model is the author.
-_AGENT_AUTHORED_ZONES: frozenset[str] = frozenset(
-    {"research", "videos", "transcriptions", "daily-briefs"},
-)
-
 _NON_ALNUM = re.compile(r"[^a-z0-9]+")
 _HEADING = re.compile(r"^#\s+(.+)$", re.MULTILINE)
 #: Notion exports append a 32-character hex id to the filename stem.
@@ -257,13 +239,13 @@ def source_title(resource: str, root: Path) -> str:
     return _NOTION_SUFFIX.sub("", stem).strip() or resource
 
 
-def source_zone(resource: str, raw_name: str = "raw") -> str:
+def source_zone(resource: str, raw_name: str) -> str:
     """Return the raw-zone subdirectory a source lives in.
 
     Args:
         resource: Repo-relative source path.
-        raw_name: Directory name of the raw zone. Configurable, so a bundle
-            that calls its sources ``notes/`` still resolves zones.
+        raw_name: Directory name of the raw zone, from the bundle's config, so a
+            bundle that calls its sources ``notes/`` still resolves zones.
 
     Returns:
         The zone name, or an empty string for files directly under the raw zone.
@@ -275,32 +257,28 @@ def source_zone(resource: str, raw_name: str = "raw") -> str:
     return ""
 
 
-def source_author(resource: str, root: Path) -> str | None:
-    """Determine the OKF actor that authored a source.
+def source_author(resource: str, root: Path, raw_name: str) -> str | None:
+    """Name the model that wrote a source, when its creation commit says so.
+
+    Git records who committed a file and not who wrote it, so the only evidence
+    of an agent author is the model trailer on the commit that created the
+    file. Nothing is inferred from the source's directory, because a guessed
+    author reads as a fact in the trust signal.
 
     Args:
         resource: Repo-relative source path.
         root: Repository root.
+        raw_name: Directory name of the raw zone, which bounds rename tracking.
 
     Returns:
-        An actor id per OKF §7, or ``None`` when it cannot be determined.
+        The model's OKF actor id, or ``None`` when the creation commit names no
+        model or the file has no history.
 
     """
-    zone = source_zone(resource)
-    if zone in _AUTHOR_BY_ZONE:
-        return _AUTHOR_BY_ZONE[zone]
-
-    if zone in _AGENT_AUTHORED_ZONES:
-        sha = gitmeta.creation_commit(_as_path(resource), zone="raw", cwd=root)
-        if sha:
-            commit = gitmeta.commit_info(sha, cwd=root)
-            if commit.model:
-                return commit.model
-        return "claude"
-
-    # Files directly under raw/ predate the subdirectory convention and were all
-    # hand-curated.
-    return "human:carel"
+    sha = gitmeta.creation_commit(_as_path(resource), zone=raw_name, cwd=root)
+    if sha is None:
+        return None
+    return gitmeta.commit_info(sha, cwd=root).model
 
 
 def _as_path(resource: str) -> Path:
@@ -309,7 +287,11 @@ def _as_path(resource: str) -> Path:
     return Path(resource)
 
 
-def build_sources(frontmatter: fm.Frontmatter, root: Path) -> list[dict[str, Any]]:
+def build_sources(
+    frontmatter: fm.Frontmatter,
+    root: Path,
+    raw_name: str,
+) -> list[dict[str, Any]]:
     """Build the OKF ``sources`` list from an article's existing metadata.
 
     Args:
@@ -317,6 +299,7 @@ def build_sources(frontmatter: fm.Frontmatter, root: Path) -> list[dict[str, Any
             :func:`okf_kb.frontmatter.source_resources`, so both the
             legacy ``source_files`` and an already-migrated ``sources`` work.
         root: Repository root.
+        raw_name: Directory name of the raw zone.
 
     Returns:
         A list of OKF source mappings in the original declaration order.
@@ -331,7 +314,7 @@ def build_sources(frontmatter: fm.Frontmatter, root: Path) -> list[dict[str, Any
             "resource": resource,
             "title": source_title(resource, root),
         }
-        author = source_author(resource, root)
+        author = source_author(resource, root, raw_name)
         if author:
             entry["author"] = author
         modified = gitmeta.last_modified(_as_path(resource), cwd=root)
@@ -341,15 +324,16 @@ def build_sources(frontmatter: fm.Frontmatter, root: Path) -> list[dict[str, Any
             entry["last_modified"] = fm.as_date(modified) or modified
         entries.append(entry)
 
-    _disambiguate_titles(entries)
+    _disambiguate_titles(entries, raw_name)
     return entries
 
 
-def _disambiguate_titles(entries: list[dict[str, Any]]) -> None:
+def _disambiguate_titles(entries: list[dict[str, Any]], raw_name: str) -> None:
     """Qualify duplicate source titles in place with their zone's role.
 
     Args:
         entries: Source mappings, each with ``title`` and ``resource``.
+        raw_name: Directory name of the raw zone.
 
     """
     counts: dict[str, int] = {}
@@ -359,24 +343,25 @@ def _disambiguate_titles(entries: list[dict[str, Any]]) -> None:
     for entry in entries:
         if counts[entry["title"]] < 2:  # noqa: PLR2004
             continue
-        qualifier = _ZONE_QUALIFIER.get(source_zone(entry["resource"]))
+        qualifier = _ZONE_QUALIFIER.get(source_zone(entry["resource"], raw_name))
         if qualifier:
             entry["title"] = f"{entry['title']} ({qualifier})"
 
 
-def build_generated(article: Path, root: Path) -> dict[str, Any] | None:
+def build_generated(article: Path, root: Path, wiki_name: str) -> dict[str, Any] | None:
     """Build the OKF ``generated`` block for an article from git history.
 
     Args:
         article: Repo-relative path to the article.
         root: Repository root.
+        wiki_name: Directory name of the wiki zone, which bounds rename tracking.
 
     Returns:
         A mapping with ``by``, ``at`` and (where known) ``skill`` and ``commit``,
         or ``None`` if the article has no git history.
 
     """
-    prov = gitmeta.provenance(article, zone="wiki", cwd=root)
+    prov = gitmeta.provenance(article, zone=wiki_name, cwd=root)
     if prov is None:
         return None
 
@@ -416,11 +401,14 @@ def reorder(frontmatter: fm.Frontmatter) -> fm.Frontmatter:
     return ordered
 
 
-def migrate(
+def migrate(  # noqa: PLR0913 (zone names are required keywords)
     document: fm.Document,
     article: Path,
     root: Path,
     description: str | None = None,
+    *,
+    wiki_name: str,
+    raw_name: str,
 ) -> fm.Document:
     """Migrate one article's frontmatter to the OKF v0.2 shape.
 
@@ -435,6 +423,8 @@ def migrate(
         root: Repository root.
         description: One-sentence summary for OKF ``description``. Ignored when
             the article already declares one.
+        wiki_name: Directory name of the wiki zone.
+        raw_name: Directory name of the raw zone.
 
     Returns:
         A new document with migrated frontmatter and an unchanged body.
@@ -455,15 +445,24 @@ def migrate(
         # summary that is the arXiv abstract page.
         data["resource"] = f"https://arxiv.org/abs/{data['arxiv']}"
 
-    sources = build_sources(data, root)
+    # Hand-written ids, titles and authors live in an existing list of mappings,
+    # and rebuilding it from the bare resource paths would drop them.
+    declared = data.get("sources")
+    keeps_sources = (
+        isinstance(declared, list)
+        and bool(declared)
+        and all(isinstance(entry, dict) for entry in declared)
+    )
+    if not keeps_sources:
+        sources = build_sources(data, root, raw_name)
+        if sources:
+            data["sources"] = sources
+        else:
+            data.pop("sources", None)
     data.pop("source_files", None)
-    if sources:
-        data["sources"] = sources
-    else:
-        data.pop("sources", None)
 
     if "generated" not in data:
-        generated = build_generated(article, root)
+        generated = build_generated(article, root, wiki_name)
         if generated:
             data["generated"] = generated
 
@@ -476,38 +475,40 @@ def migrate(
     )
 
 
-def raw_type(resource: str) -> str | None:
+def raw_type(resource: str, raw_name: str) -> str | None:
     """Derive the document type for a ``raw/`` file from its zone.
 
     Args:
         resource: Repo-relative source path, e.g. ``raw/papers/2307.08691.md``.
+        raw_name: Directory name of the raw zone.
 
     Returns:
         The type name, or ``None`` for a zone with no mapping (including files
         directly under ``raw/``), where the caller must supply one.
 
     Examples:
-        >>> raw_type("raw/papers/2307.08691.md")
+        >>> raw_type("raw/papers/2307.08691.md", "raw")
         'paper'
-        >>> raw_type("raw/notes/vllm-mac-installation.md")
+        >>> raw_type("raw/notes/vllm-mac-installation.md", "raw")
         'note'
 
     """
-    return _RAW_TYPE_BY_ZONE.get(source_zone(resource))
+    return _RAW_TYPE_BY_ZONE.get(source_zone(resource, raw_name))
 
 
-def raw_source_type(resource: str) -> str:
+def raw_source_type(resource: str, raw_name: str) -> str:
     """Derive the compilation update strategy for a ``raw/`` file from its zone.
 
     Args:
         resource: Repo-relative source path.
+        raw_name: Directory name of the raw zone.
 
     Returns:
         One of ``technical``, ``discussion``, ``experiment`` or ``meeting``.
 
     """
     return _RAW_SOURCE_TYPE_BY_ZONE.get(
-        source_zone(resource),
+        source_zone(resource, raw_name),
         _DEFAULT_RAW_SOURCE_TYPE,
     )
 
@@ -534,19 +535,20 @@ def raw_title(body: str) -> str | None:
     return None
 
 
-def creation_date(resource: str, root: Path) -> date | None:
+def creation_date(resource: str, root: Path, raw_name: str) -> date | None:
     """Find the date a ``raw/`` file first entered the repository.
 
     Args:
         resource: Repo-relative source path.
         root: Repository root.
+        raw_name: Directory name of the raw zone.
 
     Returns:
         The creating commit's date, or ``None`` when the path has no history in
         the ``raw/`` zone.
 
     """
-    sha = gitmeta.creation_commit(_as_path(resource), zone="raw", cwd=root)
+    sha = gitmeta.creation_commit(_as_path(resource), zone=raw_name, cwd=root)
     if sha is None:
         return None
     return gitmeta.commit_info(sha, cwd=root).date.date()
@@ -601,12 +603,14 @@ def reorder_raw(frontmatter: fm.Frontmatter) -> fm.Frontmatter:
     return ordered
 
 
-def migrate_raw(
+def migrate_raw(  # noqa: PLR0913 (zone names are required keywords)
     document: fm.Document,
     resource: str,
     root: Path,
     title: str | None = None,
     description: str | None = None,
+    *,
+    raw_name: str,
 ) -> fm.Document:
     """Normalise one ``raw/`` reference file's frontmatter.
 
@@ -627,6 +631,7 @@ def migrate_raw(
             where extraction picks up LaTeX cruft or a mid-document heading.
         description: One-sentence summary of what the document contains.
             Ignored when the file already declares one.
+        raw_name: Directory name of the raw zone.
 
     Returns:
         A new document with normalised frontmatter and an unchanged body.
@@ -636,7 +641,7 @@ def migrate_raw(
     strip_self_reference(data, resource)
 
     if "type" not in data:
-        derived_type = raw_type(resource)
+        derived_type = raw_type(resource, raw_name)
         if derived_type:
             data["type"] = derived_type
 
@@ -649,16 +654,16 @@ def migrate_raw(
         data["description"] = description
 
     if "author" not in data:
-        author = source_author(resource, root)
+        author = source_author(resource, root, raw_name)
         if author:
             data["author"] = author
 
     if "date_added" not in data:
-        added = creation_date(resource, root)
+        added = creation_date(resource, root, raw_name)
         if added:
             data["date_added"] = added
 
-    data.setdefault("source_type", raw_source_type(resource))
+    data.setdefault("source_type", raw_source_type(resource, raw_name))
 
     return fm.Document(
         frontmatter=reorder_raw(data),

@@ -16,8 +16,8 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
+from okf_kb import article, health, index_gen
 from okf_kb import frontmatter as fm
-from okf_kb import health, index_gen
 
 runner = CliRunner()
 
@@ -342,17 +342,17 @@ def test_cli_health_passing_flag_sets_the_passing_badge(tmp_path):
 
 
 def test_trust_tier_absent_verified_is_unverified():
-    assert index_gen.trust_tier({"type": "concept"}) == index_gen.TIER_UNVERIFIED
+    assert article.trust_tier({"type": "concept"}) == article.TIER_UNVERIFIED
 
 
 def test_trust_tier_empty_verified_is_unverified():
-    assert index_gen.trust_tier({"verified": []}) == index_gen.TIER_UNVERIFIED
-    assert index_gen.trust_tier({"verified": None}) == index_gen.TIER_UNVERIFIED
+    assert article.trust_tier({"verified": []}) == article.TIER_UNVERIFIED
+    assert article.trust_tier({"verified": None}) == article.TIER_UNVERIFIED
 
 
 def test_trust_tier_non_human_actor_is_machine_confirmed():
     data = {"verified": [{"by": "claude-opus-5", "at": "2026-01-02T00:00:00Z"}]}
-    assert index_gen.trust_tier(data) == index_gen.TIER_MACHINE
+    assert article.trust_tier(data) == article.TIER_MACHINE
 
 
 def test_trust_tier_human_actor_is_human_reviewed():
@@ -362,11 +362,11 @@ def test_trust_tier_human_actor_is_human_reviewed():
             {"by": "human:carel", "at": "2026-01-03T00:00:00Z"},
         ],
     }
-    assert index_gen.trust_tier(data) == index_gen.TIER_HUMAN
+    assert article.trust_tier(data) == article.TIER_HUMAN
 
 
 def test_trust_tier_accepts_a_bare_actor_string():
-    assert index_gen.trust_tier({"verified": "human:carel"}) == index_gen.TIER_HUMAN
+    assert article.trust_tier({"verified": "human:carel"}) == article.TIER_HUMAN
 
 
 def test_every_tier_renders_a_distinct_badge(tmp_path):
@@ -383,9 +383,9 @@ def test_every_tier_renders_a_distinct_badge(tmp_path):
         _article("C", "Human.", ["raw/c.md"], verified="human:carel"),
     )
     text = index_gen.build_indexes(wiki)[wiki / "sec" / "INDEX.md"]
-    assert index_gen.TIER_BADGES[index_gen.TIER_UNVERIFIED] in text
-    assert index_gen.TIER_BADGES[index_gen.TIER_MACHINE] in text
-    assert index_gen.TIER_BADGES[index_gen.TIER_HUMAN] in text
+    assert index_gen.TIER_BADGES[article.TIER_UNVERIFIED] in text
+    assert index_gen.TIER_BADGES[article.TIER_MACHINE] in text
+    assert index_gen.TIER_BADGES[article.TIER_HUMAN] in text
 
 
 def test_stable_status_gets_no_badge_but_draft_does(tmp_path):
@@ -416,7 +416,7 @@ def test_titleless_emoji_defaults_to_the_page_icon(tmp_path):
 
 
 def test_split_emoji_leaves_ordinary_titles_alone():
-    assert index_gen.split_emoji("Tülu 3: Open Post-Training") == (
+    assert article.split_emoji("Tülu 3: Open Post-Training") == (
         "📄",
         "Tülu 3: Open Post-Training",
     )

@@ -47,7 +47,11 @@ tests = "pytest:main"
 # fetching and rewriting and would silently skip without it. [video] costs a
 # torch download on every sync, which is the price of not having kb-video fail
 # only once someone reaches for it.
-dev = ["okf-kb[ingest,video]", "pytest>=8.3"]
+dev = [
+    "import-linter>=2.15",
+    "okf-kb[ingest,video]",
+    "pytest>=8.3",
+]
 all = ["okf-kb[ingest,video]"]
 
 [build-system]
@@ -65,3 +69,56 @@ unused-ignore-comment = "ignore"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --strict-markers"
+
+# The layers mirror the dependency direction CLAUDE.md states as rules: a higher
+# module may import a lower one and never the reverse, and modules separated by
+# `|` are independent siblings. `lint-imports` runs from pre-commit and from
+# tests/acceptance/test_boundaries.py.
+[tool.importlinter]
+root_package = "okf_kb"
+
+[[tool.importlinter.contracts]]
+name = "Read-side modules sit above the shared model and config"
+type = "layers"
+layers = [
+    "okf_kb.mcp_server",
+    "okf_kb.read | okf_kb.stats | okf_kb.health",
+    "okf_kb.graph | okf_kb.search | okf_kb.index_gen | okf_kb.provenance | okf_kb.doctor | okf_kb.ingest | okf_kb.export",
+    "okf_kb.okf",
+    "okf_kb.gitmeta | okf_kb.article | okf_kb.links | okf_kb.extras",
+    "okf_kb.frontmatter",
+    "okf_kb.config",
+]
+
+[[tool.importlinter.contracts]]
+name = "The MCP server cannot reach a writing module"
+type = "forbidden"
+source_modules = ["okf_kb.mcp_server"]
+forbidden_modules = [
+    "okf_kb.ingest",
+    "okf_kb.export",
+    "okf_kb.provenance",
+    "okf_kb.index_gen",
+    "okf_kb.okf",
+    "okf_kb.gitmeta",
+    "okf_kb.video",
+]
+
+[[tool.importlinter.contracts]]
+name = "Nothing outside okf_kb.video imports it"
+type = "forbidden"
+source_modules = [
+    "okf_kb.mcp_server",
+    "okf_kb.read",
+    "okf_kb.stats",
+    "okf_kb.health",
+    "okf_kb.graph",
+    "okf_kb.search",
+    "okf_kb.index_gen",
+    "okf_kb.provenance",
+    "okf_kb.doctor",
+    "okf_kb.ingest",
+    "okf_kb.export",
+    "okf_kb.okf",
+]
+forbidden_modules = ["okf_kb.video"]

@@ -35,8 +35,8 @@ from typing import TYPE_CHECKING, Annotated, Any
 import typer
 
 from okf_kb import config, frontmatter, links
+from okf_kb.article import INDEX_FILENAME, Article
 from okf_kb.frontmatter import is_article
-from okf_kb.index_gen import INDEX_FILENAME, Article
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -568,7 +568,7 @@ def _make_node(
     out: list[Path],
     inbound: list[Path],
 ) -> Node:
-    """Build a node, reading its metadata through ``index_gen.Article``.
+    """Build a node, reading its metadata through ``article.Article``.
 
     Args:
         path: The file.

@@ -550,8 +550,8 @@ def test_source_links_are_parsed_from_a_renamed_raw_zone(tmp_path):
 
 def test_source_zone_honours_a_renamed_raw_zone():
     assert okf.source_zone("notes/papers/x.md", "notes") == "papers"
-    assert okf.source_zone("notes/papers/x.md") == ""
-    assert okf.source_zone("raw/papers/x.md") == "papers"
+    assert okf.source_zone("notes/papers/x.md", "raw") == ""
+    assert okf.source_zone("raw/papers/x.md", "raw") == "papers"
 
 
 # -- extract-pdf keeps figures --------------------------------------------------

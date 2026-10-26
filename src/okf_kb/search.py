@@ -19,8 +19,8 @@ from typing import TYPE_CHECKING, Annotated, Any
 import typer
 
 from okf_kb import config, frontmatter
+from okf_kb.article import split_emoji
 from okf_kb.frontmatter import is_article
-from okf_kb.index_gen import split_emoji
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

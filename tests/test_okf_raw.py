@@ -147,10 +147,10 @@ class TestRawType:
         ],
     )
     def test_type_is_derived_from_the_zone(self, resource, expected) -> None:
-        assert okf.raw_type(resource) == expected
+        assert okf.raw_type(resource, "raw") == expected
 
     def test_unknown_zone_has_no_derived_type(self) -> None:
-        assert okf.raw_type("raw/loose-note.md") is None
+        assert okf.raw_type("raw/loose-note.md", "raw") is None
 
 
 class TestRawSourceType:
@@ -159,14 +159,14 @@ class TestRawSourceType:
         ["raw/meetings/2026-08-04-kpi.md", "raw/daily-briefs/2026-07-09.md"],
     )
     def test_chronological_zones_are_meetings(self, resource) -> None:
-        assert okf.raw_source_type(resource) == "meeting"
+        assert okf.raw_source_type(resource, "raw") == "meeting"
 
     @pytest.mark.parametrize(
         "resource",
         ["raw/papers/2307.08691.md", "raw/notes/plain.md", "raw/loose.md"],
     )
     def test_everything_else_is_technical(self, resource) -> None:
-        assert okf.raw_source_type(resource) == "technical"
+        assert okf.raw_source_type(resource, "raw") == "technical"
 
 
 class TestRawTitle:
@@ -235,26 +235,26 @@ class TestReorderRaw:
 
 class TestMigrateRawPreservation:
     def test_self_reference_is_dropped(self, repo: Path) -> None:
-        result = okf.migrate_raw(_document(MEETING_FILE), MEETING, repo)
+        result = okf.migrate_raw(_document(MEETING_FILE), MEETING, repo, raw_name="raw")
         assert "sources" not in result.frontmatter
         assert "source_files" not in result.frontmatter
 
     def test_compile_false_survives(self, repo: Path) -> None:
         """`compile: false` keeps a source out of the wiki, so losing it leaks."""
-        result = okf.migrate_raw(_document(MEETING_FILE), MEETING, repo)
+        result = okf.migrate_raw(_document(MEETING_FILE), MEETING, repo, raw_name="raw")
         assert result.frontmatter["compile"] is False
 
     def test_meeting_date_and_attendees_survive(self, repo: Path) -> None:
-        result = okf.migrate_raw(_document(MEETING_FILE), MEETING, repo)
+        result = okf.migrate_raw(_document(MEETING_FILE), MEETING, repo, raw_name="raw")
         assert result.frontmatter["meeting_date"] == "2026-07-16 13:00"
         assert result.frontmatter["attendees"] == ["Brett Orwin", "Thomas Schumacher"]
 
     def test_attendees_stay_on_one_line(self, repo: Path) -> None:
-        result = okf.migrate_raw(_document(MEETING_FILE), MEETING, repo)
+        result = okf.migrate_raw(_document(MEETING_FILE), MEETING, repo, raw_name="raw")
         assert "attendees: [Brett Orwin, Thomas Schumacher]" in result.to_text()
 
     def test_video_block_survives_intact(self, repo: Path) -> None:
-        result = okf.migrate_raw(_document(VIDEO_FILE), VIDEO, repo)
+        result = okf.migrate_raw(_document(VIDEO_FILE), VIDEO, repo, raw_name="raw")
         assert result.frontmatter["video"] == {
             "url": "https://www.youtube.com/watch?v=OeirQdzYdnc",
             "video_id": "OeirQdzYdnc",
@@ -275,6 +275,7 @@ class TestMigrateRawPreservation:
             repo,
             title="Ignored",
             description="Ignored",
+            raw_name="raw",
         )
         assert result.frontmatter["type"] == "meeting-log"
         assert result.frontmatter["date_added"] == dt.date(2026, 7, 16)
@@ -283,7 +284,7 @@ class TestMigrateRawPreservation:
 
     def test_body_is_byte_identical(self, repo: Path) -> None:
         document = _document(MEETING_FILE)
-        result = okf.migrate_raw(document, MEETING, repo)
+        result = okf.migrate_raw(document, MEETING, repo, raw_name="raw")
         assert result.body == document.body
 
     def test_body_is_byte_identical_when_frontmatter_is_added(
@@ -292,7 +293,12 @@ class TestMigrateRawPreservation:
     ) -> None:
         document = _document(ARXIV_FILE)
         assert not document.has_frontmatter
-        result = okf.migrate_raw(document, "raw/papers/2307.08691.md", repo)
+        result = okf.migrate_raw(
+            document,
+            "raw/papers/2307.08691.md",
+            repo,
+            raw_name="raw",
+        )
         assert result.body == ARXIV_FILE
         assert result.to_text().endswith(ARXIV_FILE)
 
@@ -303,6 +309,7 @@ class TestMigrateRawDerivation:
             _document(ARXIV_FILE),
             "raw/papers/2307.08691.md",
             repo,
+            raw_name="raw",
         )
         assert result.frontmatter["type"] == "paper"
         assert result.frontmatter["source_type"] == "technical"
@@ -312,6 +319,7 @@ class TestMigrateRawDerivation:
             _document(ARXIV_FILE),
             "raw/papers/2307.08691.md",
             repo,
+            raw_name="raw",
         )
         assert result.frontmatter["title"].startswith("FlashAttention-2:")
 
@@ -321,6 +329,7 @@ class TestMigrateRawDerivation:
             "raw/papers/2411.15124.md",
             repo,
             title="Tülu 3",
+            raw_name="raw",
         )
         assert result.frontmatter["title"] == "Tülu 3"
 
@@ -330,51 +339,54 @@ class TestMigrateRawDerivation:
             "raw/papers/2307.08691.md",
             repo,
             description="A one-sentence summary.",
+            raw_name="raw",
         )
         assert result.frontmatter["description"] == "A one-sentence summary."
 
     @pytest.mark.parametrize(
-        ("resource", "expected"),
+        "resource",
         [
-            (MEETING, "human:carel"),
-            ("raw/notes/plain.md", "human:carel"),
-            ("raw/loose-note.md", "human:carel"),
-            ("raw/papers/2307.08691.md", "process:kb-ingest"),
-            ("raw/clippings/article.md", "process:kb-ingest"),
+            MEETING,
+            "raw/notes/plain.md",
+            "raw/loose-note.md",
+            "raw/papers/2307.08691.md",
+            "raw/clippings/article.md",
         ],
     )
-    def test_author_comes_from_the_zone_role(
+    def test_no_author_is_inferred_from_the_zone(
         self,
         repo: Path,
         resource,
-        expected,
     ) -> None:
-        """Git author is useless: the owner commits everything regardless."""
-        result = okf.migrate_raw(_document("# T\n"), resource, repo)
-        assert result.frontmatter["author"] == expected
+        """Git names the committer, not the writer, so no trailer means no author."""
+        result = okf.migrate_raw(_document("# T\n"), resource, repo, raw_name="raw")
+        assert "author" not in result.frontmatter
 
     def test_agent_zone_author_is_the_attested_model(self, repo: Path) -> None:
         result = okf.migrate_raw(
             _document("# Daily Brief — 2026-07-09\n"),
             "raw/daily-briefs/2026-07-09.md",
             repo,
+            raw_name="raw",
         )
         assert result.frontmatter["author"] == "claude-sonnet-5"
 
-    def test_agent_zone_author_falls_back_to_claude(self, repo: Path) -> None:
+    def test_agent_zone_author_is_absent_without_a_trailer(self, repo: Path) -> None:
         """The research brief's commit carries no `Co-Authored-By` trailer."""
         result = okf.migrate_raw(
             _document("# A Research Brief\n"),
             "raw/research/brief.md",
             repo,
+            raw_name="raw",
         )
-        assert result.frontmatter["author"] == "claude"
+        assert "author" not in result.frontmatter
 
     def test_date_added_comes_from_the_creating_commit(self, repo: Path) -> None:
         result = okf.migrate_raw(
             _document(ARXIV_FILE),
             "raw/papers/2307.08691.md",
             repo,
+            raw_name="raw",
         )
         assert result.frontmatter["date_added"] == dt.date.today()  # noqa: DTZ011
 
@@ -383,6 +395,7 @@ class TestMigrateRawDerivation:
             _document(ARXIV_FILE),
             "raw/papers/never-committed.md",
             tmp_path,
+            raw_name="raw",
         )
         assert "date_added" not in result.frontmatter
 
@@ -392,9 +405,10 @@ class TestMigrateRawDerivation:
             MEETING,
             repo,
             description="Summary.",
+            raw_name="raw",
         )
         leading = list(result.frontmatter)[:5]
-        assert leading == ["type", "title", "description", "author", "date_added"]
+        assert leading == ["type", "title", "description", "date_added", "tags"]
 
 
 class TestMigrateRawIdempotency:
@@ -412,11 +426,13 @@ class TestMigrateRawIdempotency:
             resource,
             repo,
             description="Summary.",
+            raw_name="raw",
         )
         twice = okf.migrate_raw(
             _document(once.to_text()),
             resource,
             repo,
             description="A different summary.",
+            raw_name="raw",
         )
         assert twice.to_text() == once.to_text()

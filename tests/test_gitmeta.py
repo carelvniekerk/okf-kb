@@ -265,6 +265,7 @@ class TestRecoveredHistory:
     def test_untracked_path_returns_none(self, history) -> None:
         sha = gitmeta.creation_commit(
             Path("wiki/does-not-exist.md"),
+            zone="wiki",
             cwd=history["root"],
         )
         assert sha is None
@@ -272,6 +273,7 @@ class TestRecoveredHistory:
     def test_provenance_recovers_attested_model(self, history) -> None:
         prov = gitmeta.provenance(
             Path("wiki/efficiency/tiling.md"),
+            zone="wiki",
             cwd=history["root"],
         )
         assert prov is not None

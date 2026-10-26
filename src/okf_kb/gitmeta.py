@@ -229,7 +229,7 @@ def _parse_name_status(raw: str) -> list[_Record]:
 
 
 def rename_map(
-    zone: str = "wiki",
+    zone: str,
     cwd: Path | None = None,
 ) -> dict[str, tuple[str, str]]:
     """Build a ``{new_path: (old_path, sha)}`` map of renames inside ``zone``.
@@ -243,7 +243,7 @@ def rename_map(
     visible, and renames from outside it are excluded by construction.
 
     Args:
-        zone: Directory to scan, e.g. ``wiki``.
+        zone: Directory to scan, as the bundle names it (``wiki`` by default).
         cwd: Repository directory.
 
     Returns:
@@ -288,7 +288,7 @@ def _adds(path: str, cwd: Path | None = None) -> list[_Record]:
 
 def creation_commit(
     article: Path,
-    zone: str = "wiki",
+    zone: str,
     cwd: Path | None = None,
 ) -> str | None:
     """Find the commit that produced an article's current content lineage.
@@ -300,7 +300,7 @@ def creation_commit(
 
     Args:
         article: Repository-relative path to the article.
-        zone: Directory the article must stay within, e.g. ``wiki``.
+        zone: Directory the article must stay within, as the bundle names it.
         cwd: Repository directory.
 
     Returns:
@@ -383,7 +383,7 @@ def skill_version(skill: str, at_commit: str, cwd: Path | None = None) -> str | 
 
 def provenance(
     article: Path,
-    zone: str = "wiki",
+    zone: str,
     cwd: Path | None = None,
 ) -> Provenance | None:
     """Recover full production provenance for an article.

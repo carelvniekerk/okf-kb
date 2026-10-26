@@ -5,6 +5,9 @@ from typing import Annotated
 
 import typer
 
+from okf_kb import config
+from okf_kb.article import INDEX_FILENAME
+
 app = typer.Typer(help="Export tools for the knowledge base.")
 
 
@@ -48,18 +51,20 @@ def marp(
 
 @app.command()
 def consolidate(
-    wiki_dir: Annotated[Path, typer.Option(exists=True, help="Wiki directory.")] = Path(
-        "wiki",
-    ),
+    wiki_dir: Annotated[
+        Path | None,
+        typer.Option(exists=True, help="Wiki directory. Defaults to the bundle's."),
+    ] = None,
     output: Annotated[Path, typer.Option(help="Output file.")] = Path("wiki-export.md"),
 ) -> None:
     """Consolidate the entire wiki into a single markdown file.
 
     Useful for feeding the full wiki into an LLM context window or for printing.
     """
-    index_path = wiki_dir / "INDEX.md"
+    wiki_dir = config.resolve_dir(wiki_dir, "wiki")
+    index_path = wiki_dir / INDEX_FILENAME
     if not index_path.exists():
-        typer.echo("[ERROR] wiki/INDEX.md not found.")
+        typer.echo(f"[ERROR] {index_path} not found.")
         raise typer.Exit(1)
 
     md_files = sorted(wiki_dir.rglob("*.md"))

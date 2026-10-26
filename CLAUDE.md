@@ -12,7 +12,7 @@ Instructions for working **on** okf-kb.
 Two halves of one product, shipped from one repo:
 
 | Half | Lives in | Installed by |
-|---|---|---|
+| --- | --- | --- |
 | The `kb-*` commands | `src/okf_kb/` | `uv tool install "okf-kb[…] @ git+…"` |
 | The skills that drive them | `plugins/` | `claude plugin install kb@okf-kb` |
 
@@ -31,16 +31,17 @@ first into the second with provenance tracked per source.
 
 ## Layout
 
-```
+```text
 src/okf_kb/            # the Python package — one module per kb-* command
 ├── config.py          # bundle discovery + okf.toml. Everything goes through here
 ├── frontmatter.py     # the ONLY place YAML frontmatter is read or written
-├── okf.py             # OKF v0.2 schema construction
+├── okf.py             # OKF v0.2 schema construction, run by kb-provenance migrate --write
+├── article.py         # the Article model and INDEX_FILENAME, below index_gen, graph and search
 ├── links.py           # the ONLY markdown link scanner
 ├── graph.py           # kb-graph: the link graph, backlinks, traversal
 ├── read.py            # kb-read: print one article from any bundle in scope
 ├── mcp_server.py      # kb-mcp: search, graph and read as MCP tools
-├── gitmeta.py         # git archaeology, for provenance backfill
+├── gitmeta.py         # git archaeology, for provenance backfill (used by okf.py)
 ├── extras.py          # optional-dependency handling. See "Extras" below
 ├── doctor.py          # kb-doctor, and kb-doctor bundles
 ├── index_gen.py       # kb-index
@@ -58,6 +59,7 @@ src/okf_kb/            # the Python package — one module per kb-* command
 
 plugins/               # the Claude Code marketplace — one directory per plugin
 ├── kb/                # init, adopt, compile, health, verify
+│   ├── agents/        # source-reviewer: read-only article-against-sources check for verify
 │   ├── hooks/         # guard-human-signoff: asks before any new human: sign-off
 │   ├── references/    # house-style.md, tooling.md: read via ${CLAUDE_PLUGIN_ROOT}
 │   └── skills/init/templates/   # what /kb:init scaffolds INTO a bundle
@@ -91,6 +93,7 @@ uv run tests                 # pytest, via the `tests` script in pyproject
 uvx ruff check . --fix
 uvx ruff format .
 uvx ty check
+uv run lint-imports        # the module boundaries in [tool.importlinter]
 pre-commit run --all-files
 ```
 
@@ -124,7 +127,7 @@ no `kb-*` tool runs inside it. Test those skills against a bundle in
 Heavy, platform-sensitive dependencies are opt-in:
 
 | Extra | Brings | Needed by |
-|---|---|---|
+| --- | --- | --- |
 | — | core only | `kb`, `kb-capture` |
 | `[ingest]` | `pymupdf`, `requests`, `beautifulsoup4`, `markdownify` | `kb-ingest` |
 | `[video]` | `yt-dlp`, `mlx-whisper`, `python-slugify` — **and `ffmpeg`** | `kb-video` |
@@ -191,6 +194,14 @@ agree; nothing enforces the rest.
 
 ## Package conventions
 
+**The module layers are checked, not just stated.** `[tool.importlinter]` in
+`pyproject.toml` fixes which modules may import which: a higher layer imports a
+lower one and never the reverse, and modules separated by `|` are independent
+siblings. Adding a module means placing it in a layer. `kb-mcp` may not reach a
+writing module, and nothing outside `okf_kb.video` imports it. Provenance
+written by `kb-provenance migrate --write` comes from git history only, so a
+source without a model trailer gets no `author` rather than a guessed one.
+
 **`config.py` owns every path.** Tools find their bundle by walking up from the
 working directory for `okf.toml`, the way `git` finds `.git` — that is what
 lets a command run from anywhere inside a bundle rather than only from its
@@ -247,7 +258,9 @@ catches it, or typer prints a traceback over the useful message; that is why
 **Never hardcode `raw/` or `wiki/` in a skill.** A skill that writes into a
 bundle runs `kb-doctor paths` first and writes `<raw>`, `<wiki>` and `<log>`
 thereafter, because `/kb:adopt` keeps a folder's own zone names. The same
-reasoning as the package rule above; `tests/test_skills.py` enforces it.
+reasoning as the package rule above; `tests/test_skills.py` enforces it. The
+rule covers `description` and `argument-hint` too, which that test does not
+scan, so write "the raw zone" there.
 
 **Bundled files go through the path variables.** `${CLAUDE_SKILL_DIR}` for a
 skill's own `references/` and `templates/`, `${CLAUDE_PLUGIN_ROOT}` for a
@@ -272,7 +285,16 @@ or commits.
 skill.** The `kb` plugin's `hooks/guard-human-signoff.py` returns `ask` on any
 Edit or Write that adds a `human:` actor under `verified`, so a sign-off reaches
 the permission prompt even in auto mode. It is stdlib-only, runs through
-`uv run --script`, and fails closed. `tests/test_hooks.py` feeds it real events.
+`uv run --script`, and asks on input it cannot read. A missing `uv` or the
+timeout is a non-blocking error in Claude Code, so the edit goes through then.
+It guards Edit and Write only, so a sign-off written through Bash is not seen.
+`tests/test_hooks.py` feeds it real events.
+
+**Agents live in the plugin that delegates to them**, under `agents/`, and a
+skill names one by its scoped name (`kb:source-reviewer`). A plugin agent
+ignores `hooks`, `mcpServers` and `permissionMode`, so its `tools` list is the
+only enforcement of read-only. Nothing in `tests/test_skills.py` covers agents
+yet, so test one by running its skill against a bundle in `scratch/`.
 
 **A plugin's MCP tools carry the plugin's prefix**:
 `mcp__plugin_<plugin>_<server>__<tool>`, as `kb-query`'s do. The test fails on
@@ -310,13 +332,10 @@ Test the contract, not the implementation. `test_extras.py` asserts on message
 *content* because the message is the feature: the sharpest test in the file is
 that a fix suggested to a user who has `[ingest]` still contains `[ingest]`.
 
-## Conventions inherited from the global config
+## Lint configuration
 
-Google-style docstrings with `Args`/`Returns`/`Raises`, double quotes, `|`
-unions, `TypeAlias` for aliases, specific exceptions. Commit messages are
-`<type>: <description>`. Ruff runs `select = ["ALL"]` from
-`~/.config/ruff/ruff.toml`, so expect to justify a `noqa` rather than sprinkle
-them.
+Ruff runs `select = ["ALL"]` from `~/.config/ruff/ruff.toml`, so expect to
+justify a `noqa` rather than sprinkle them.
 
 ## Manual testing
 

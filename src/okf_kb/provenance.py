@@ -20,7 +20,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from okf_kb import config, frontmatter
+from okf_kb import config, frontmatter, okf
 from okf_kb.frontmatter import is_article
 
 app = typer.Typer(help="Source provenance tracking for the knowledge base.")
@@ -427,12 +427,93 @@ def classify(
         )
 
 
+def _needs_migration(data: frontmatter.Frontmatter) -> bool:
+    """Say whether an article still lacks OKF provenance.
+
+    Args:
+        data: The article's parsed frontmatter.
+
+    Returns:
+        ``True`` when ``sources`` is not a list of mappings or ``generated`` is
+        absent. Articles that carry both are left untouched, so a run never
+        reorders or reformats a wiki that is already migrated.
+
+    """
+    sources = data.get("sources")
+    has_okf_sources = (
+        isinstance(sources, list)
+        and bool(sources)
+        and all(isinstance(entry, dict) for entry in sources)
+    )
+    return not has_okf_sources or "generated" not in data
+
+
+def _write_migration(wiki_dir: Path | None) -> None:
+    """Migrate every article that lacks OKF provenance, and report the result.
+
+    Args:
+        wiki_dir: Directory to scan, or ``None`` for the bundle's wiki zone.
+            Zone names for git history always come from the bundle.
+
+    Raises:
+        ConfigError: If no bundle encloses the working directory. Nothing is
+            written in that case.
+
+    """
+    cfg = config.load()
+    wiki_name = cfg.relative(cfg.wiki).as_posix()
+    raw_name = cfg.relative(cfg.raw).as_posix()
+    console = Console()
+    changed = 0
+
+    scan_dir = (wiki_dir or cfg.wiki).resolve()
+    if not scan_dir.is_relative_to(cfg.root):
+        msg = f"{scan_dir} is outside the bundle at {cfg.root}"
+        raise typer.BadParameter(msg, param_hint="--wiki-dir")
+
+    for md_file in sorted(scan_dir.rglob("*.md")):
+        if not is_article(md_file):
+            continue
+        rel = md_file.relative_to(cfg.root)
+        try:
+            document = frontmatter.load(md_file)
+        except frontmatter.FrontmatterError as exc:
+            console.print(f"[yellow]skipped {rel}: {exc}[/yellow]")
+            continue
+        if not _needs_migration(document.frontmatter):
+            continue
+
+        migrated = okf.migrate(
+            document,
+            rel,
+            cfg.root,
+            wiki_name=wiki_name,
+            raw_name=raw_name,
+        )
+        if "generated" not in migrated.frontmatter:
+            console.print(f"[yellow]{rel}: no git history, generated omitted[/yellow]")
+        if list(migrated.frontmatter.items()) == list(document.frontmatter.items()):
+            continue
+        frontmatter.save(migrated)
+        changed += 1
+        console.print(f"changed {rel}")
+
+    console.print(f"Changed {changed} article(s).")
+
+
 @app.command()
 def migrate(
     wiki_dir: Annotated[
         Path | None,
         typer.Option("--wiki-dir", help="Wiki directory. Defaults to the bundle's."),
     ] = None,
+    write: Annotated[  # noqa: FBT002
+        bool,
+        typer.Option(
+            "--write",
+            help="Write OKF provenance into articles that lack it, from git history.",
+        ),
+    ] = False,
 ) -> None:
     """Report articles that declare no provenance in their frontmatter.
 
@@ -440,9 +521,16 @@ def migrate(
     but the body has a ``## Sources`` section, the links are parsed and printed
     as a starting point.
 
-    Does not modify files. Full migration of an article to the OKF schema is
-    :func:`okf_kb.okf.migrate`; this command only surfaces the gap.
+    Without ``--write`` no file changes. With it, each article whose frontmatter
+    is not yet in the OKF shape is migrated by :func:`okf_kb.okf.migrate`, which
+    derives ``sources`` and ``generated`` from git history and leaves out
+    whatever history cannot support. The body and any ``verified`` record stay
+    as they are. The command must run inside a bundle, because the zone names
+    come from its configuration.
     """
+    if write:
+        _write_migration(wiki_dir)
+        return
     cfg_wiki = config.resolve_dir(wiki_dir, "wiki")
     raw_name = _raw_zone_name(wiki_dir)
     wiki_dir = cfg_wiki

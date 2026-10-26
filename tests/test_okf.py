@@ -73,25 +73,28 @@ class TestSourceZone:
         ],
     )
     def test_zone(self, resource: str, expected: str) -> None:
-        assert okf.source_zone(resource) == expected
+        assert okf.source_zone(resource, "raw") == expected
 
 
 class TestSourceAuthor:
-    def test_human_curated_zones(self, tmp_path) -> None:
-        assert okf.source_author("raw/notes/x.md", tmp_path) == "human:carel"
-        assert okf.source_author("raw/meetings/x.md", tmp_path) == "human:carel"
-
-    def test_fetched_zones_are_a_process(self, tmp_path) -> None:
-        """Papers are fetched, not authored — the actor is the fetcher."""
-        assert okf.source_author("raw/papers/x.md", tmp_path) == "process:kb-ingest"
-        assert okf.source_author("raw/clippings/x.md", tmp_path) == "process:kb-ingest"
-
-    def test_loose_files_default_to_the_curator(self, tmp_path) -> None:
-        assert okf.source_author("raw/loose.md", tmp_path) == "human:carel"
-
-    def test_agent_zone_falls_back_when_untracked(self, tmp_path) -> None:
-        """Outside a git repo there is no commit to attribute, so fall back."""
-        assert okf.source_author("raw/research/x.md", tmp_path) == "claude"
+    @pytest.mark.parametrize(
+        "resource",
+        [
+            "raw/notes/x.md",
+            "raw/meetings/x.md",
+            "raw/papers/x.md",
+            "raw/clippings/x.md",
+            "raw/loose.md",
+            "raw/research/x.md",
+        ],
+    )
+    def test_no_author_is_inferred_from_the_directory(
+        self,
+        tmp_path,
+        resource: str,
+    ) -> None:
+        """Git names the committer, not the writer, so no trailer means no author."""
+        assert okf.source_author(resource, tmp_path, "raw") is None
 
 
 class TestSourceTitle:
@@ -177,65 +180,119 @@ class TestMigrate:
 
     def test_source_files_is_removed(self, tmp_path) -> None:
         doc, rel = self._article(tmp_path)
-        out = okf.migrate(doc, rel, tmp_path)
+        out = okf.migrate(doc, rel, tmp_path, wiki_name="wiki", raw_name="raw")
         assert "source_files" not in out.frontmatter
 
     def test_sources_becomes_a_list_of_mappings(self, tmp_path) -> None:
         doc, rel = self._article(tmp_path)
-        out = okf.migrate(doc, rel, tmp_path)
+        out = okf.migrate(doc, rel, tmp_path, wiki_name="wiki", raw_name="raw")
         sources = out.frontmatter["sources"]
         assert isinstance(sources, list)
         assert sources[0]["id"] == "alpha"
         assert sources[0]["resource"] == "raw/notes/alpha.md"
         assert sources[0]["title"] == "Alpha Note"
-        assert sources[0]["author"] == "human:carel"
+        assert "author" not in sources[0]
 
     def test_integer_count_is_gone(self, tmp_path) -> None:
         """The redundant `sources: <int>` must not survive migration."""
         doc, rel = self._article(tmp_path)
-        out = okf.migrate(doc, rel, tmp_path)
+        out = okf.migrate(doc, rel, tmp_path, wiki_name="wiki", raw_name="raw")
         assert not isinstance(out.frontmatter["sources"], int)
 
     def test_status_defaults_to_stable(self, tmp_path) -> None:
         doc, rel = self._article(tmp_path)
-        assert okf.migrate(doc, rel, tmp_path).frontmatter["status"] == "stable"
+        assert (
+            okf.migrate(
+                doc,
+                rel,
+                tmp_path,
+                wiki_name="wiki",
+                raw_name="raw",
+            ).frontmatter["status"]
+            == "stable"
+        )
 
     def test_verified_is_never_written(self, tmp_path) -> None:
         """Absent `verified` is the honest unverified tier under OKF §5.2."""
         doc, rel = self._article(tmp_path)
-        assert "verified" not in okf.migrate(doc, rel, tmp_path).frontmatter
+        assert (
+            "verified"
+            not in okf.migrate(
+                doc,
+                rel,
+                tmp_path,
+                wiki_name="wiki",
+                raw_name="raw",
+            ).frontmatter
+        )
 
     def test_local_extensions_survive(self, tmp_path) -> None:
         doc, rel = self._article(tmp_path)
-        out = okf.migrate(doc, rel, tmp_path)
+        out = okf.migrate(doc, rel, tmp_path, wiki_name="wiki", raw_name="raw")
         assert out.frontmatter["source_type"] == "technical"
         assert out.frontmatter["date_added"] == dt.date(2026, 4, 4)
 
     def test_body_is_untouched(self, tmp_path) -> None:
         doc, rel = self._article(tmp_path)
-        assert okf.migrate(doc, rel, tmp_path).body == doc.body
+        assert (
+            okf.migrate(doc, rel, tmp_path, wiki_name="wiki", raw_name="raw").body
+            == doc.body
+        )
 
     def test_key_order_is_canonical(self, tmp_path) -> None:
         doc, rel = self._article(tmp_path)
-        keys = list(okf.migrate(doc, rel, tmp_path).frontmatter)
+        keys = list(
+            okf.migrate(
+                doc,
+                rel,
+                tmp_path,
+                wiki_name="wiki",
+                raw_name="raw",
+            ).frontmatter,
+        )
         assert keys.index("type") < keys.index("sources")
         assert keys.index("sources") < keys.index("source_type")
 
     def test_is_idempotent(self, tmp_path) -> None:
         """Re-running must not double-migrate or churn the data."""
         doc, rel = self._article(tmp_path)
-        once = okf.migrate(doc, rel, tmp_path)
-        twice = okf.migrate(once, rel, tmp_path)
+        once = okf.migrate(doc, rel, tmp_path, wiki_name="wiki", raw_name="raw")
+        twice = okf.migrate(once, rel, tmp_path, wiki_name="wiki", raw_name="raw")
         assert once.frontmatter == twice.frontmatter
+
+    def test_existing_source_mappings_are_kept(self, tmp_path) -> None:
+        """A curated `sources` list holds ids and authors that paths cannot rebuild."""
+        doc, rel = self._article(tmp_path)
+        curated = [
+            {
+                "id": "my-own-id",
+                "resource": "raw/notes/alpha.md",
+                "title": "Hand-written title",
+                "author": "human:someone",
+            },
+        ]
+        doc.frontmatter.pop("source_files")
+        doc.frontmatter["sources"] = curated
+        out = okf.migrate(doc, rel, tmp_path, wiki_name="wiki", raw_name="raw")
+        assert out.frontmatter["sources"] == curated
 
     def test_existing_status_is_not_overwritten(self, tmp_path) -> None:
         doc, rel = self._article(tmp_path)
         doc.frontmatter["status"] = "draft"
-        assert okf.migrate(doc, rel, tmp_path).frontmatter["status"] == "draft"
+        assert (
+            okf.migrate(
+                doc,
+                rel,
+                tmp_path,
+                wiki_name="wiki",
+                raw_name="raw",
+            ).frontmatter["status"]
+            == "draft"
+        )
 
     def test_result_round_trips_through_the_parser(self, tmp_path) -> None:
         doc, rel = self._article(tmp_path)
-        out = okf.migrate(doc, rel, tmp_path)
+        out = okf.migrate(doc, rel, tmp_path, wiki_name="wiki", raw_name="raw")
         reparsed, _ = fm.parse(fm.dumps(out.frontmatter, out.body))
         assert reparsed["sources"][0]["id"] == "alpha"
         assert reparsed["status"] == "stable"
