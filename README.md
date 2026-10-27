@@ -40,7 +40,7 @@ no lock-in — if you stop using these tools tomorrow, you still have your notes
 Day to day the loop is short:
 
 ```bash
-/kb-ingest:ingest 2402.12345         # a paper, a URL, a PDF → raw/
+/kb-ingest:ingest 2402.12345         # a paper, a URL, a PDF or Word file → raw/
 /kb-video:video <youtube-url>        # a talk → transcript + frames → raw/
 /kb-capture:capture note             # something you said out loud → raw/
 /kb-capture:capture meeting          # notes or a recap + its calendar event → raw/
@@ -49,7 +49,7 @@ Day to day the loop is short:
 ```
 
 `/kb:compile` is the pipeline that does the real work. It transcribes
-handwritten notes, converts PDFs, detects which sources are new, modified or
+handwritten notes, converts PDFs, Office documents and e-books, detects which sources are new, modified or
 deleted, classifies each one, finds the existing articles it relates to,
 applies a type-appropriate update strategy, regenerates the indexes, runs the
 health checks, and commits.
@@ -202,7 +202,7 @@ The skills drive these; you can also run them directly.
 | `kb-graph` | Walk the wiki's cross-links: section roots, one article's backlinks, neighbours, shortest path |
 | `kb-read` | Print one article, or one section of it, from any knowledge base in scope; refuses paths outside the wikis |
 | `kb-provenance` | Map, retract, classify and migrate source provenance |
-| `kb-ingest` | Fetch arXiv papers, extract PDFs with their figures, clip web pages verbatim, convert HTML, localise images |
+| `kb-ingest` | Fetch arXiv papers, convert PDFs (with their figures), Word, PowerPoint, Excel, EPUB and Outlook files to markdown, clip web pages verbatim, convert HTML, localise images |
 | `kb-export` | Marp slide decks, or the whole wiki flattened to one file |
 | `kb-video` | Stage a YouTube video's captions, audio and frames |
 | `kb-mcp` | The read-only wiki tools as a stdio MCP server, for the `wiki` skill and the Claude desktop app |

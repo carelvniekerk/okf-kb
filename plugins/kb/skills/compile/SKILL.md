@@ -2,12 +2,13 @@
 name: compile
 description: >
   Run the knowledge base compilation pipeline. Transcribes handwritten notes,
-  converts PDFs, detects new, modified and deleted sources since the last compile,
+  converts PDFs, Office documents and e-books, detects new, modified and deleted
+  sources since the last compile,
   integrates each into the wiki with a strategy chosen by source type, regenerates
   the indexes, runs the health check and commits. Use when the user says
   "compile", "update the wiki" or "process new sources".
 disable-model-invocation: true
-allowed-tools: Read Write Edit Bash(kb-*) Bash(git log *) Bash(git diff *) Bash(git status *) Bash(git show *) Bash(git add *) Bash(git commit *) Bash(basename *) Bash(date *) Bash(rg *)
+allowed-tools: Read Write Edit Bash(kb-*) Bash(git log *) Bash(git diff *) Bash(git status *) Bash(git show *) Bash(git add *) Bash(git rm *) Bash(git commit *) Bash(basename *) Bash(date *) Bash(rg *)
 ---
 
 # Compile
@@ -20,7 +21,7 @@ The wiki is only as trustworthy as its link to the sources, so the rule that gov
 - Rules for everything you write
 - 0. Resolve the bundle's paths
 - 1. Transcribe handwritten notes
-- 2. Convert raw PDFs
+- 2. Convert raw documents
 - 3. Detect changes
 - 4. Handle deletions
 - 5. Integrate new and modified sources
@@ -55,30 +56,51 @@ Keep the original structure, describe diagrams in text, write maths in LaTeX and
 Never modify or delete anything in `<raw>/handwritten/`.
 If you transcribed anything, commit it: `git add <raw>/transcriptions/ && git commit -m "transcribe: <N> handwritten notes"`.
 
-## 2. Convert raw PDFs
+## 2. Convert raw documents
 
-Find `.pdf` files in `<raw>` and its subdirectories that have no `.md` beside them, and run `kb-ingest extract-pdf <file>` on each.
-It writes the markdown beside the PDF and saves embedded figures to `<raw>/images/<stem>/`, linked from the markdown.
-If any were converted, commit them: `git add <raw> && git commit -m "ingest: convert <N> PDFs to markdown"`.
+Run `kb-ingest list-unconverted --json-output`.
+It groups the files in `<raw>` by what conversion still owes them, and it needs no extra, so it also works in a core-only install.
+Compile works only from markdown, so the converted `.md` is the source and `sources.resource` points at it, never at the original.
 
-`extract-pdf` needs the `[ingest]` extra, which the `kb` plugin does not.
-If it reports the extra missing, skip this step, list the unconverted PDFs in the log entry and relay the install command from the error verbatim.
+- `missing` and `stale`: run `kb-ingest convert <file>` on each.
+  It writes the markdown beside the original, records the original's hash in `converted_sha256` and saves embedded images to `<raw>/images/<stem>/`, linked from the markdown.
+  Commit what it wrote: `git add <raw> && git commit -m "ingest: convert <N> documents to markdown"`.
+- `unsupported`: formats no converter reads, such as `.doc` and `.ppt`.
+  List them in the log entry and leave them alone.
+- `conflicting`: another original, such as a PDF with the same name, already owns the markdown file.
+  List them in the log entry and ask which original to keep.
+  Never pass `--force` for these.
+- `orphaned`: the markdown's original no longer exists.
+  Ask whether to delete the markdown too.
+  If the user agrees, run `git rm <md>` and commit it on its own: `git commit -m "ingest: remove <N> markdown files whose originals are gone"`.
+  Do that before step 3, so step 4 prunes the wiki articles that cited it.
+- `legacy`: markdown with no conversion record, which may be hand-written.
+  Mention them once and offer `kb-ingest convert --force <file>`, which replaces the body and keeps the frontmatter.
+  Never reconvert them unasked.
+
+`kb-ingest convert` needs the `[ingest]` extra, which the `kb` plugin does not.
+If it reports the extra missing, skip the conversions, list the unconverted files in the log entry and relay the install command from the error verbatim.
 Never compose an install command yourself.
 
 ## 3. Detect changes
 
 Compare against the last compile, not the working tree.
+Change detection considers only markdown files.
+An original such as a `.pdf` or `.docx` is never integrated, and neither is anything under `<raw>/images/`.
 The ingest, capture, transcribe and video skills commit or stage the raw source and then offer to compile, so a `HEAD` diff alone sees nothing.
 `init:` commits count as a baseline too, so the first compile after `/kb:adopt` does not re-integrate everything the adoption just mapped.
 
 ```bash
 LAST=$(git log -1 --format=%H -E --grep='^(compile|init):')
-git diff --name-only --diff-filter=AM "$LAST"..HEAD -- <raw>   # new and modified
-git diff --name-only --diff-filter=D  "$LAST"..HEAD -- <raw>   # deleted
-git status --porcelain -- <raw>                                 # not yet committed
+git diff --name-only --diff-filter=AM "$LAST"..HEAD -- '<raw>/*.md'   # new and modified
+git diff --name-only --diff-filter=D  "$LAST"..HEAD -- '<raw>/*.md'   # deleted
+git status --porcelain -- <raw>                                        # not yet committed
 ```
 
-If `LAST` is empty, there is no baseline: treat every file in `<raw>` as new, except `<raw>/handwritten/`.
+In a git pathspec `*` also matches `/`, so `'<raw>/*.md'` reaches every subfolder.
+Ignore the files in the `git status` output that are not markdown.
+
+If `LAST` is empty, there is no baseline: treat every markdown file in `<raw>` as new, except those under `<raw>/handwritten/` and `<raw>/images/`.
 
 Uncommitted files need the user's word before they are compiled.
 A live meeting note from `/kb-capture:meeting` stays uncommitted until the meeting ends, and a video article from `/kb-video:video` is written but not committed.

@@ -124,7 +124,7 @@ A JSON serialiser rewrites `"🩺 Health"` as `"🩺 Health"`, which still rende
 Create the skeleton with the names agreed in step 2:
 
 ```bash
-mkdir -p <raw>/notes <raw>/papers <raw>/images <output> <wiki>
+mkdir -p <raw>/notes <raw>/papers <raw>/documents <raw>/images <output> <wiki>
 ```
 
 Add one `<wiki>` subdirectory per agreed section, and record each in `okf.toml` under `[directories]` and `[[groups]]`.

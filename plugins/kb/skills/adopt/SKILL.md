@@ -60,6 +60,9 @@ Which files are sources (a fetched paper, a clipping, a transcript) and which ar
 Is there a hand-maintained `README.md` or `INDEX.md`? If so, read it, because it is the best draft of `[directories]` and `[[groups]]`.
 How deep is the git history? History is what lets step 5 recover real provenance instead of stamping today.
 
+Also list the originals that no markdown stands for: `.docx`, `.pptx`, `.xlsx`, `.xls`, `.epub`, `.msg` and PDFs with no `.md` beside them.
+A `.doc` or `.ppt` cannot be converted, so list it too and do not skip it silently.
+
 ## 3. Propose the mapping
 
 Present a concrete plan and get agreement before moving a single file:
@@ -67,9 +70,14 @@ Present a concrete plan and get agreement before moving a single file:
 - which directory becomes the raw zone and which the wiki zone, keeping the existing names;
 - any file you propose to move, and why, keeping that list as short as honestly possible (if sources and articles are already apart, move nothing);
 - the starting taxonomy, drawn from the existing index or directory names;
+- every original you propose to move into `<raw>/documents/`, created only if the user agrees to at least one, because a Word or PowerPoint file beside the articles is a source and not noise;
 - every file you could not classify, listed rather than swept into one side.
 
 Where sources and articles are intermixed in one directory, propose a split and let the user confirm each ambiguous file.
+
+Do not convert the originals here.
+`/kb:compile` runs `kb-ingest convert` on each one in its step 2 and then integrates the markdown as a new source, whereas converting during adoption would put it before the baseline commit, which compile skips.
+If `kb-ingest` reports the `[ingest]` extra missing, relay the install command from its error or from `kb-doctor --require kb-ingest`, and never compose one.
 A misclassification either freezes an article as an immutable source or lets a source be rewritten as an article.
 
 ## 4. Write okf.toml and the log
