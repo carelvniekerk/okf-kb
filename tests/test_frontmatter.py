@@ -243,3 +243,18 @@ def test_load_error_names_the_file(tmp_path) -> None:
 def test_save_without_path_raises() -> None:
     with pytest.raises(ValueError, match="no path"):
         fm.save(fm.Document(frontmatter={"type": "concept"}, body="x"))
+
+
+def test_ac_18_converted_sha256_is_always_quoted_and_stays_a_string() -> None:
+    """A digest is an identifier, so it must read back as text however it looks.
+
+    PyYAML already quotes a digest made only of digits, so the round trip alone
+    would pass without the key being forced. The quoting style is what pins it,
+    so that an unusual digest and an ordinary one are written the same way.
+    """
+    for digest in ("1" * 64, "0" * 64, "123e4567" + "0" * 56, "ab" * 32):
+        text = fm.dumps({"converted_sha256": digest}, "body\n")
+
+        assert f'converted_sha256: "{digest}"' in text
+        meta, _ = fm.parse(text)
+        assert meta["converted_sha256"] == digest

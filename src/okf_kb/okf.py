@@ -103,6 +103,7 @@ RAW_KEY_ORDER: tuple[str, ...] = (
 _RAW_TYPE_BY_ZONE: dict[str, str] = {
     "papers": "paper",
     "notes": "note",
+    "documents": "document",
     "clippings": "clipping",
     "research": "research-brief",
     "transcriptions": "transcription",

@@ -1,1 +1,1 @@
-- **`kb-ingest`**: `arxiv`, `clip` (a web page, verbatim), `extract-pdf` (text and figures), `html-to-md`, `download-images`, `list-untranscribed`. Needs the `[ingest]` extra.
+- **`kb-ingest`**: `arxiv`, `clip` (a web page, verbatim), `convert` (a PDF, Word, PowerPoint, Excel, EPUB or Outlook file to markdown, recording its hash), `extract-pdf` (text and figures), `html-to-md`, `download-images`, `list-untranscribed`, `list-unconverted`. Needs the `[ingest]` extra, except the two `list-` commands.

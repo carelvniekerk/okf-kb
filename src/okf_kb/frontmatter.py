@@ -39,7 +39,9 @@ FLOW_SEQUENCE_KEYS: frozenset[str] = frozenset({"tags", "attendees"})
 #: Keys whose scalar value must always be quoted, because YAML would otherwise
 #: coerce them to a non-string type. ``arxiv: 2104.09864`` parses as a float and
 #: silently loses its identity as an identifier.
-FORCE_QUOTED_KEYS: frozenset[str] = frozenset({"arxiv", "okf_version", "kb_format"})
+FORCE_QUOTED_KEYS: frozenset[str] = frozenset(
+    {"arxiv", "okf_version", "kb_format", "converted_sha256"},
+)
 
 
 #: Structural files reserved by OKF (§8, §9). They carry no frontmatter and are

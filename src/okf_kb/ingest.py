@@ -2,20 +2,36 @@
 
 Download images, extract PDF text and figures, convert HTML to markdown, clip
 web pages, fetch arXiv papers, and find new handwritten notes for transcription.
+
+``convert`` turns a document of any supported format into markdown beside the
+original, and ``list-unconverted`` finds what still needs converting. The
+markdown records the original's SHA-256, so an edited original is noticed, and
+a hand-written markdown file is never overwritten without ``--force``. PDFs and
+HTML keep their own converters (PyMuPDF keeps figures, markdownify matches
+``clip``), and every other supported format goes through the markitdown library
+with no plugins and no external service, so nothing leaves the machine.
+``list-unconverted`` needs no extra, so a core-only install can still find work.
 """
 
+import base64
 import datetime as dt
+import hashlib
+import importlib
+import json
 import os
 import re
+import subprocess
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, NoReturn
 from urllib.parse import urljoin
 
 import typer
 
-from okf_kb import config, extras, frontmatter
+from okf_kb import config, extras, frontmatter, okf
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     import fitz
 
 app = typer.Typer(help="Ingestion tools for the knowledge base.")
@@ -165,6 +181,30 @@ def _pdf_markdown(
     return "\n".join(lines) + "\n"
 
 
+def _pdf_to_markdown(
+    pdf_file: Path,
+    image_dir: Path,
+    md_dir: Path,
+) -> tuple[str, int]:
+    """Open a PDF and render it with :func:`_pdf_markdown`.
+
+    Args:
+        pdf_file: The PDF to read.
+        image_dir: Where to save its figures.
+        md_dir: Directory of the markdown file, so image links resolve from it.
+
+    Returns:
+        The markdown text and the number of pages in the PDF.
+
+    """
+    with extras.required("ingest"):
+        import fitz  # pymupdf  # noqa: PLC0415
+
+    with fitz.open(pdf_file) as doc:
+        md = _pdf_markdown(doc, [f"# {pdf_file.stem}\n"], image_dir, md_dir)
+        return md, len(doc)
+
+
 @app.command()
 def extract_pdf(
     pdf_file: Annotated[
@@ -185,18 +225,14 @@ def extract_pdf(
     ] = None,
 ) -> None:
     """Extract text and figures from a PDF and save as markdown."""
-    with extras.required("ingest"):
-        import fitz  # pymupdf  # noqa: PLC0415
-
     if output is None:
         output = pdf_file.with_suffix(".md")
     if image_dir is None:
         image_dir = config.resolve_dir(None, "raw") / "images" / pdf_file.stem
 
-    doc = fitz.open(pdf_file)
-    md = _pdf_markdown(doc, [f"# {pdf_file.stem}\n"], image_dir, output.parent)
+    md, pages = _pdf_to_markdown(pdf_file, image_dir, output.parent)
     output.write_text(md, encoding="utf-8")
-    typer.echo(f"Extracted {len(doc)} pages to {output}")
+    typer.echo(f"Extracted {pages} pages to {output}")
 
 
 def _slugify(text: str, max_length: int = 60) -> str:
@@ -311,6 +347,24 @@ def clip(
         download_images(markdown_file=output, image_dir=None)
 
 
+def _html_to_markdown(html: str) -> str:
+    """Convert HTML text to markdown, dropping scripts and styles.
+
+    Args:
+        html: The page source.
+
+    Returns:
+        The markdown, with runs of blank lines collapsed and one trailing newline.
+
+    """
+    with extras.required("ingest"):
+        from markdownify import markdownify  # noqa: PLC0415
+
+    md = markdownify(html, heading_style="ATX", strip=["script", "style"])
+    md = re.sub(r"\n{3,}", "\n\n", md)
+    return md.strip() + "\n"
+
+
 @app.command()
 def html_to_md(
     html_file: Annotated[
@@ -320,19 +374,11 @@ def html_to_md(
     output: Annotated[Path | None, typer.Option(help="Output markdown file.")] = None,
 ) -> None:
     """Convert an HTML file to clean markdown."""
-    with extras.required("ingest"):
-        from markdownify import markdownify  # noqa: PLC0415
-
     if output is None:
         output = html_file.with_suffix(".md")
 
-    html = html_file.read_text(encoding="utf-8")
-    md = markdownify(html, heading_style="ATX", strip=["script", "style"])
-
-    # Clean up excessive blank lines
-    md = re.sub(r"\n{3,}", "\n\n", md)
-
-    output.write_text(md.strip() + "\n", encoding="utf-8")
+    md = _html_to_markdown(html_file.read_text(encoding="utf-8"))
+    output.write_text(md, encoding="utf-8")
     typer.echo(f"Converted {html_file} to {output}")
 
 
@@ -550,6 +596,595 @@ def list_untranscribed(
         typer.echo(f"  {f}")
 
     typer.echo(f"\nTranscriptions will be saved to: {transcriptions_dir}/")
+
+
+#: Suffixes that go through markitdown, each with the modules that must import for
+#: its converter to run. markitdown raises its own ``MissingDependencyException``
+#: rather than an ``ImportError`` when a sub-extra's library is absent, which
+#: ``extras.required`` would not translate, so ingest imports these first.
+MARKITDOWN_MODULES: dict[str, tuple[str, ...]] = {
+    ".docx": ("mammoth",),
+    ".pptx": ("pptx",),
+    ".xlsx": ("pandas", "openpyxl"),
+    ".xls": ("pandas", "xlrd"),
+    ".epub": (),
+    ".msg": ("olefile",),
+}
+MARKITDOWN_SUFFIXES: frozenset[str] = frozenset(MARKITDOWN_MODULES)
+HTML_SUFFIXES: frozenset[str] = frozenset({".html", ".htm"})
+PDF_SUFFIX = ".pdf"
+
+#: Document formats that no converter handles. They are reported and never
+#: guessed at, because a wrong conversion would be cited as if it were the source.
+UNSUPPORTED_SUFFIXES: frozenset[str] = frozenset(
+    {".doc", ".ppt", ".rtf", ".odt", ".odp", ".ods", ".pages", ".key", ".numbers"},
+)
+
+_CONVERTIBLE_SUFFIXES = MARKITDOWN_SUFFIXES | HTML_SUFFIXES | {PDF_SUFFIX}
+
+#: Raw-zone folders that ``list-unconverted`` leaves alone. ``transcribe`` owns
+#: ``handwritten/``, and ``images/`` holds what conversions produce.
+_SKIPPED_ZONES = ("handwritten", "images")
+
+#: The groups ``list-unconverted`` reports, with what each one means.
+_LISTING_GROUPS = {
+    "missing": "no markdown yet",
+    "stale": "changed since the last conversion",
+    "unsupported": "no converter handles these formats",
+    "orphaned": "markdown whose original no longer exists",
+    "legacy": "markdown with no conversion record, reconvert with --force",
+    "conflicting": "another original already owns the markdown file",
+}
+
+_DATA_URI_IMAGE = re.compile(
+    r"!\[(?P<alt>[^\]]*)\]\(data:image/(?P<kind>[A-Za-z0-9.+-]+);base64,"
+    r"(?P<data>[^)\s]+)\)",
+)
+_IMAGE_EXTENSIONS = {"jpeg": "jpg", "svg+xml": "svg", "tiff": "tif"}
+
+
+def _fail(message: str) -> NoReturn:
+    typer.echo(f"[ERROR] {message}", err=True)
+    raise typer.Exit(1)
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while chunk := handle.read(1 << 20):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _smaller_side(data: bytes) -> int | None:
+    """Read the shorter side of an image, or ``None`` if PyMuPDF cannot decode it."""
+    with extras.required("ingest"):
+        import fitz  # noqa: PLC0415
+
+    try:
+        pixmap = fitz.Pixmap(data)
+    except fitz.mupdf.FzErrorBase, ValueError:
+        # SVG, EMF and WMF are not raster formats, a corrupt image fails inside
+        # MuPDF, and an empty payload raises ValueError. None of them is a reason
+        # to drop an image the author embedded.
+        return None
+    return min(pixmap.width, pixmap.height)
+
+
+def _image_namespace(original: str) -> str:
+    """Name the image files of one original, so same-stem originals never share one.
+
+    Every original with one stem shares ``<raw>/images/<stem>/``, and
+    ``kb-health`` looks for that directory by name, so the directory cannot
+    change. The file names carry the namespace instead.
+
+    Args:
+        original: The original's path relative to the bundle root, in POSIX form.
+
+    Returns:
+        The first eight hex digits of its SHA-256. Eight digits are 32 bits, which
+        makes a clash between two paths in one bundle negligible.
+
+    """
+    return hashlib.sha256(original.encode()).hexdigest()[:8]
+
+
+def _remove_images(image_dir: Path, namespace: str) -> None:
+    """Delete the images that an earlier conversion of one original saved.
+
+    Only ``image-<namespace>-NNN.<ext>`` goes, so a clipping image, a PDF figure
+    or another original's image in the same directory survives.
+
+    Args:
+        image_dir: The directory the earlier conversion saved to. It may not exist.
+        namespace: The original's :func:`_image_namespace`.
+
+    """
+    if not image_dir.is_dir():
+        return
+    saved = re.compile(rf"image-{re.escape(namespace)}-\d{{3,}}\.[A-Za-z0-9]+")
+    for path in image_dir.iterdir():
+        if path.is_file() and saved.fullmatch(path.name):
+            path.unlink()
+
+
+def _extract_data_uri_images(
+    text: str,
+    image_dir: Path,
+    md_dir: Path,
+    namespace: str,
+) -> str:
+    """Save every base64 image in ``text`` to disk and link it by relative path.
+
+    markitdown inlines Office images as data URIs, which would put megabytes of
+    base64 into a raw file and make every diff unreadable. Images whose shorter
+    side is under :data:`MIN_FIGURE_PX` are dropped, as for PDFs. An image whose
+    size cannot be read is kept, with a warning. The images that an earlier
+    conversion of the same original saved are removed first, so an original that
+    lost an image does not leave it behind.
+
+    Args:
+        text: Markdown holding ``![alt](data:image/<kind>;base64,...)`` links.
+        image_dir: Where to save the images, as ``image-<namespace>-NNN.<ext>``.
+            Created only if there is an image to save.
+        md_dir: Directory of the markdown file, so links resolve from it.
+        namespace: The original's :func:`_image_namespace`.
+
+    Returns:
+        The markdown with each kept image linked relatively, and no blank-line runs.
+
+    """
+    _remove_images(image_dir, namespace)
+    position = 0
+    saved = 0
+
+    def replace(match: re.Match[str]) -> str:
+        nonlocal position, saved
+        position += 1
+        data = base64.b64decode(match["data"])
+        side = _smaller_side(data)
+        if side is None:
+            typer.echo(
+                f"[WARN] Could not read the size of image {position}, kept it.",
+                err=True,
+            )
+        elif side < MIN_FIGURE_PX:
+            return ""
+        kind = match["kind"].lower()
+        extension = _IMAGE_EXTENSIONS.get(
+            kind,
+            re.sub(r"\W", "", kind.removeprefix("x-")),
+        )
+        image_dir.mkdir(parents=True, exist_ok=True)
+        path = image_dir / f"image-{namespace}-{position:03d}.{extension}"
+        path.write_bytes(data)
+        saved += 1
+        rel = Path(os.path.relpath(path.resolve(), md_dir.resolve())).as_posix()
+        alt = match["alt"] or f"Figure {position}"
+        return f"![{alt}]({rel})"
+
+    text = _DATA_URI_IMAGE.sub(replace, text)
+    if saved:
+        typer.echo(f"Saved {saved} image(s) to {image_dir}")
+    return re.sub(r"\n{3,}", "\n\n", text).strip() + "\n"
+
+
+def _markitdown_to_markdown(
+    source: Path,
+    image_dir: Path,
+    md_dir: Path,
+    namespace: str,
+) -> str:
+    """Convert an Office document, e-book or Outlook message with markitdown.
+
+    Plugins are disabled and no ``llm_client`` or Document Intelligence endpoint
+    is given, so the conversion runs locally and nothing leaves the machine.
+
+    Args:
+        source: The document to convert.
+        image_dir: Where to save its images.
+        md_dir: Directory of the markdown file, so image links resolve from it.
+        namespace: The original's :func:`_image_namespace`, which names its images.
+
+    Returns:
+        The markdown text.
+
+    Raises:
+        typer.Exit: With code 1 when markitdown cannot read the file.
+
+    """
+    with extras.required("ingest"):
+        for module in MARKITDOWN_MODULES[source.suffix.lower()]:
+            importlib.import_module(module)
+        from markitdown import (  # noqa: PLC0415
+            FileConversionException,
+            MarkItDown,
+            UnsupportedFormatException,
+        )
+
+    try:
+        result = MarkItDown(enable_plugins=False).convert(
+            source,
+            keep_data_uris=True,
+        )
+    except (FileConversionException, UnsupportedFormatException) as exc:
+        _fail(f"Could not convert {source}: {exc}")
+    return _extract_data_uri_images(result.text_content, image_dir, md_dir, namespace)
+
+
+def _convert_pdf(
+    source: Path,
+    image_dir: Path,
+    md_dir: Path,
+    _namespace: str,
+) -> str:
+    # PDF figures keep the page-NNN-N names that extract-pdf writes, so two
+    # same-stem PDFs can still share an image directory.
+    return _pdf_to_markdown(source, image_dir, md_dir)[0]
+
+
+def _convert_html(
+    source: Path,
+    _image_dir: Path,
+    _md_dir: Path,
+    _namespace: str,
+) -> str:
+    return _html_to_markdown(source.read_text(encoding="utf-8"))
+
+
+#: Converter name and function for each suffix, taking ``(original, image_dir,
+#: md_dir, namespace)`` and returning the markdown body. The name goes into
+#: ``converter:``.
+_CONVERTERS: dict[str, tuple[str, Callable[[Path, Path, Path, str], str]]] = {
+    PDF_SUFFIX: ("pymupdf", _convert_pdf),
+    **dict.fromkeys(HTML_SUFFIXES, ("markdownify", _convert_html)),
+    **dict.fromkeys(MARKITDOWN_SUFFIXES, ("markitdown", _markitdown_to_markdown)),
+}
+
+
+def _recorded_original(md: Path, meta: frontmatter.Frontmatter) -> Path | None:
+    """Resolve the original a conversion names in ``converted_from``."""
+    recorded = meta.get("converted_from")
+    if not isinstance(recorded, str) or not recorded:
+        return None
+    return (md.parent / recorded).resolve()
+
+
+def _frontmatter_of(md: Path) -> frontmatter.Frontmatter:
+    """Read a file's frontmatter, naming a malformed block instead of failing.
+
+    Listing must survive one bad file, so a malformed block is reported on stderr
+    and read as no frontmatter, which makes the file ``legacy``.
+    """
+    try:
+        return frontmatter.load(md).frontmatter
+    except frontmatter.FrontmatterError as exc:
+        typer.echo(f"[WARN] {exc}", err=True)
+        return {}
+
+
+def _classify(original: Path) -> str:
+    """Say where an original stands against the markdown beside it.
+
+    Returns:
+        ``missing``, ``legacy``, ``conflicting``, ``stale`` or ``fresh``.
+
+    """
+    md = original.with_suffix(".md")
+    if not md.exists():
+        return "missing"
+    meta = _frontmatter_of(md)
+    recorded = _recorded_original(md, meta)
+    if recorded is None:
+        return "legacy"
+    if recorded != original.resolve():
+        return "conflicting"
+    return "fresh" if meta.get("converted_sha256") == _sha256(original) else "stale"
+
+
+def _git_files(raw: Path) -> list[Path] | None:
+    """List tracked and untracked-but-not-ignored files under ``raw``.
+
+    Returns:
+        Paths relative to ``raw``, or ``None`` when ``raw`` is not in a git work
+        tree or git is not installed.
+
+    """
+    try:
+        # A fixed argument list with no user input, run in the raw directory.
+        done = subprocess.run(
+            ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],  # noqa: S607
+            cwd=raw,
+            capture_output=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        return None
+    if done.returncode != 0:
+        return None
+    return [Path(name) for name in done.stdout.decode().split("\0") if name]
+
+
+def _raw_files(raw: Path) -> list[Path]:
+    """List the files ``list-unconverted`` should consider, as absolute paths.
+
+    Respects ``.gitignore`` by asking git, and outside a git work tree falls back
+    to a plain walk. ``git ls-files --cached`` still names a tracked file that was
+    deleted and not yet committed, so only paths that exist are kept, and that is
+    what lets its markdown surface as orphaned. Dot-prefixed paths and the
+    ``handwritten/`` and ``images/`` folders are skipped in both modes.
+    """
+    if not raw.is_dir():
+        return []
+    listed = _git_files(raw)
+    if listed is None:
+        typer.echo(
+            "[NOTE] Not a git work tree, so .gitignore is not applied.",
+            err=True,
+        )
+        listed = [path.relative_to(raw) for path in raw.rglob("*")]
+    files = [
+        raw / rel
+        for rel in listed
+        if rel.parts[0] not in _SKIPPED_ZONES
+        and not any(part.startswith(".") for part in rel.parts)
+        and (raw / rel).is_file()
+    ]
+    return sorted(set(files))
+
+
+def _scan_unconverted(cfg: config.Config) -> dict[str, list[str]]:
+    """Group the raw zone's documents by what conversion still owes them."""
+    groups: dict[str, list[Path]] = {name: [] for name in _LISTING_GROUPS}
+    for path in _raw_files(cfg.raw):
+        suffix = path.suffix.lower()
+        if suffix in _CONVERTIBLE_SUFFIXES:
+            state = _classify(path)
+            if state != "fresh":
+                groups[state].append(path)
+        elif suffix in UNSUPPORTED_SUFFIXES:
+            groups["unsupported"].append(path)
+        elif suffix == ".md":
+            original = _recorded_original(path, _frontmatter_of(path))
+            if original is not None and not original.exists():
+                groups["orphaned"].append(path)
+    return {
+        name: sorted(cfg.relative(path).as_posix() for path in paths)
+        for name, paths in groups.items()
+    }
+
+
+def _conversion_record(
+    source: Path,
+    output: Path,
+    converter: str,
+    digest: str,
+) -> frontmatter.Frontmatter:
+    """Say which bytes a markdown file was converted from, and how and when.
+
+    Args:
+        source: The original document.
+        output: The markdown file being written.
+        converter: ``pymupdf``, ``markdownify`` or ``markitdown``.
+        digest: SHA-256 of the original's bytes.
+
+    Returns:
+        The four ``converted*`` frontmatter keys.
+
+    """
+    return {
+        "converted_from": Path(os.path.relpath(source, output.parent)).as_posix(),
+        "converted_sha256": digest,
+        "converter": converter,
+        "converted": dt.datetime.now(dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+
+
+def _converted_frontmatter(
+    existing: frontmatter.Frontmatter,
+    record: frontmatter.Frontmatter,
+    output: Path,
+    body: str,
+    cfg: config.Config,
+) -> frontmatter.Frontmatter:
+    """Build the frontmatter of a converted file.
+
+    Keeps every key already on the file, so ``compile: false``, tags and a
+    hand-edited title survive a reconversion, then lays the conversion record
+    over it and lets :func:`okf.migrate_raw` add the raw identity keys that are
+    missing. A new file has no git history to date it, so today stands in for
+    ``date_added``.
+
+    Args:
+        existing: Frontmatter of the markdown being replaced, or empty.
+        record: The conversion record from :func:`_conversion_record`.
+        output: The markdown file being written.
+        body: The converted markdown.
+        cfg: The bundle's configuration.
+
+    Returns:
+        The merged frontmatter, with the raw identity keys first.
+
+    """
+    # migrate_raw's `title` argument overrides the body's heading, so it is only
+    # passed when the body has none.
+    title = None if okf.raw_title(body) else output.stem
+    migrated = okf.migrate_raw(
+        frontmatter.Document(
+            frontmatter={**existing, **record},
+            body=body,
+            path=output,
+        ),
+        output.relative_to(cfg.root.resolve()).as_posix(),
+        cfg.root,
+        title=title,
+        raw_name=cfg.relative(cfg.raw).as_posix(),
+    )
+    result = dict(migrated.frontmatter)
+    result.setdefault("type", "document")
+    result.setdefault("date_added", dt.datetime.now(dt.UTC).date())
+    return okf.reorder_raw(result)
+
+
+def _existing_frontmatter(output: Path, *, force: bool) -> frontmatter.Frontmatter:
+    """Read the frontmatter of the markdown file that a conversion will replace.
+
+    A block that cannot be read has nothing to keep, and ``list-unconverted``
+    files such a file under ``legacy`` and points the user at ``--force``. So
+    ``--force`` discards the block and says so, and without it the file is left
+    as it is.
+
+    Args:
+        output: The existing markdown file.
+        force: Whether the user passed ``--force``.
+
+    Returns:
+        The file's frontmatter, or an empty mapping for an unreadable block that
+        ``--force`` discards.
+
+    Raises:
+        typer.Exit: With code 1 when the block cannot be read and ``force`` is
+            not set.
+
+    """
+    try:
+        return frontmatter.load(output).frontmatter
+    except frontmatter.FrontmatterError as exc:
+        if not force:
+            _fail(
+                f"{exc}. Repair or remove the file, or pass --force to discard "
+                "its frontmatter and replace the file.",
+            )
+        typer.echo(
+            f"[WARN] {exc}. Discarded the unreadable frontmatter, and the "
+            "converted file starts from a new one.",
+            err=True,
+        )
+        return {}
+
+
+@app.command()
+def convert(
+    file: Annotated[
+        Path,
+        typer.Argument(exists=True, dir_okay=False, help="Document to convert."),
+    ],
+    output: Annotated[
+        Path | None,
+        typer.Option(help="Output markdown file (default: beside the original)."),
+    ] = None,
+    image_dir: Annotated[
+        Path | None,
+        typer.Option(
+            help="Directory for embedded images. Defaults to <raw>/images/<stem>/.",
+        ),
+    ] = None,
+    force: Annotated[  # noqa: FBT002
+        bool,
+        typer.Option(
+            "--force",
+            help="Replace markdown that has no conversion record or belongs to "
+            "another original, keeping its frontmatter. Frontmatter that cannot "
+            "be read is discarded, with a warning.",
+        ),
+    ] = False,
+) -> None:
+    """Convert a document to markdown beside the original, recording its hash.
+
+    PDFs keep their figures, HTML is converted as ``html-to-md`` does, and Word,
+    PowerPoint, Excel, EPUB and Outlook messages go through markitdown. The
+    markdown names the original and its SHA-256, so a later run can tell whether
+    it is up to date. A markdown file with no such record may be hand-written, so
+    it is only replaced with ``--force``, and so is one whose frontmatter cannot
+    be read, which loses that frontmatter. Images from Word, PowerPoint, Excel,
+    EPUB and Outlook files are named ``image-<namespace>-NNN.<ext>``, so two
+    originals with one stem keep their own, and a reconversion removes only the
+    images its original wrote.
+
+    Raises:
+        typer.Exit: With code 1 for a markdown or unsupported file, or for an
+            existing markdown file that is not this original's conversion.
+
+    """
+    cfg = config.load()
+    source = file.resolve()
+    suffix = source.suffix.lower()
+    if suffix == ".md":
+        _fail(f"{file} is already markdown.")
+    if suffix not in _CONVERTERS:
+        _fail(
+            f"Cannot convert {suffix or 'a file with no suffix'}. "
+            f"Supported suffixes: {', '.join(sorted(_CONVERTERS))}.",
+        )
+
+    output = (output or source.with_suffix(".md")).resolve()
+    if not output.is_relative_to(cfg.root.resolve()):
+        _fail(f"The output {output} is outside the bundle at {cfg.root}.")
+    image_dir = image_dir or cfg.raw / "images" / source.stem
+    digest = _sha256(source)
+
+    existing: frontmatter.Frontmatter = {}
+    if output.exists():
+        existing = _existing_frontmatter(output, force=force)
+        recorded = _recorded_original(output, existing)
+        if recorded is None and not force:
+            _fail(
+                f"{output} has no converted_from, so it may be hand-written. "
+                "Pass --force to replace its body and keep its frontmatter.",
+            )
+        if recorded not in (None, source) and not force:
+            _fail(
+                f"{output} was converted from {existing['converted_from']}, "
+                f"not {source.name}. Pass --force to replace it.",
+            )
+        if (
+            recorded == source
+            and existing.get("converted_sha256") == digest
+            and not force
+        ):
+            typer.echo(f"{output} is up to date.")
+            return
+
+    name, converter = _CONVERTERS[suffix]
+    namespace = _image_namespace(cfg.relative(source).as_posix())
+    body = converter(source, image_dir, output.parent, namespace)
+    record = _conversion_record(source, output, name, digest)
+    meta = _converted_frontmatter(existing, record, output, body, cfg)
+    output.write_text(frontmatter.dumps(meta, body), encoding="utf-8")
+    typer.echo(f"Converted {source} to {output}")
+
+
+@app.command()
+def list_unconverted(
+    json_output: Annotated[  # noqa: FBT002
+        bool,
+        typer.Option("--json-output", help="Print the groups as JSON."),
+    ] = False,
+) -> None:
+    """List raw documents that have no up-to-date markdown beside them.
+
+    This is a helper for the agent. It needs no extra, only hashing and
+    frontmatter, so a core-only install can still find work. Paths are relative
+    to the bundle root.
+    """
+    groups = _scan_unconverted(config.load())
+    if json_output:
+        typer.echo(json.dumps(groups, indent=2))
+        return
+
+    if not any(groups.values()):
+        typer.echo("All raw documents have been converted.")
+        return
+
+    total = sum(map(len, groups.values()))
+    typer.echo(f"Found {total} file{'' if total == 1 else 's'} to look at:\n")
+    for name, meaning in _LISTING_GROUPS.items():
+        if not groups[name]:
+            continue
+        typer.echo(f"{name} ({len(groups[name])}): {meaning}")
+        for path in groups[name]:
+            typer.echo(f"  {path}")
+        typer.echo("")
 
 
 if __name__ == "__main__":

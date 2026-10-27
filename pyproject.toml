@@ -20,6 +20,7 @@ dependencies = [
 ingest = [
     "beautifulsoup4>=4.12",
     "markdownify>=0.13",
+    "markitdown[docx,pptx,xlsx,xls,outlook]>=0.1.8,<0.2",
     "pymupdf>=1.24",
     "requests>=2.31",
 ]
@@ -51,6 +52,7 @@ dev = [
     "import-linter>=2.15",
     "okf-kb[ingest,video]",
     "pytest>=8.3",
+    "python-docx>=1.1",
 ]
 all = ["okf-kb[ingest,video]"]
 

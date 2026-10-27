@@ -139,6 +139,7 @@ class TestRawType:
         [
             ("raw/papers/2307.08691.md", "paper"),
             ("raw/notes/vllm-mac-installation.md", "note"),
+            ("raw/documents/quarterly-report.md", "document"),
             ("raw/clippings/some-article.md", "clipping"),
             ("raw/research/rag-vs-kb.md", "research-brief"),
             ("raw/transcriptions/Notes_260211.md", "transcription"),

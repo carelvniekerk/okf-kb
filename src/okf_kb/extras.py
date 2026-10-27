@@ -43,7 +43,22 @@ GIT_SOURCE = "git+ssh://git@github.com/carelvniekerk/okf-kb"
 #: names, not distribution names, because that is what a failed import reports.
 EXTRA_MODULES: Final[Mapping[str, tuple[str, ...]]] = MappingProxyType(
     {
-        "ingest": ("bs4", "fitz", "markdownify", "requests"),
+        # The markitdown sub-extras raise their own MissingDependencyException at
+        # convert time rather than an ImportError, so their libraries are listed
+        # here for kb-doctor to probe, and ingest imports them before converting.
+        "ingest": (
+            "bs4",
+            "fitz",
+            "mammoth",
+            "markdownify",
+            "markitdown",
+            "olefile",
+            "openpyxl",
+            "pandas",
+            "pptx",
+            "requests",
+            "xlrd",
+        ),
         "video": ("mlx_whisper", "slugify", "yt_dlp"),
     },
 )

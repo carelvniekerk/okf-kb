@@ -4,6 +4,7 @@
         "wiki": "graphql",
         "output": "temp",
         "papers": "lib",
+        "documents": "docs",
         "clippings": "import",
         "notes": "resource",
         "research": "review",

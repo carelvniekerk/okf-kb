@@ -129,7 +129,7 @@ Heavy, platform-sensitive dependencies are opt-in:
 | Extra | Brings | Needed by |
 | --- | --- | --- |
 | — | core only | `kb`, `kb-capture` |
-| `[ingest]` | `pymupdf`, `requests`, `beautifulsoup4`, `markdownify` | `kb-ingest` |
+| `[ingest]` | `pymupdf`, `requests`, `beautifulsoup4`, `markdownify`, `markitdown` (with its `docx`, `pptx`, `xlsx`, `xls` and `outlook` sub-extras) | `kb-ingest` |
 | `[video]` | `yt-dlp`, `mlx-whisper`, `python-slugify` — **and `ffmpeg`** | `kb-video` |
 | `[all]` | both | |
 
@@ -147,7 +147,7 @@ wrapped in the guard.** Never at module scope — a core-only install must impor
 and run every module, and fail only at the subcommand whose extra is missing.
 
 ```python
-def extract_pdf(...) -> None:
+def _pdf_to_markdown(...) -> tuple[str, int]:
     with extras.required("ingest"):
         import fitz  # noqa: PLC0415
 ```
@@ -156,6 +156,13 @@ The guard turns `ModuleNotFoundError: No module named 'fitz'` — which names
 neither the extra nor the environment it is missing from — into a message
 naming both, plus the command that fixes it. A bare lazy import is a bug even
 though it "works".
+
+markitdown needs one more step. When a sub-extra's library is missing it raises
+its own `MissingDependencyException` at convert time, which is not an
+`ImportError`, so the guard would not translate it. `ingest.MARKITDOWN_MODULES`
+maps each suffix to the modules that back it, and `_markitdown_to_markdown`
+imports them inside the guard before it calls markitdown. A new suffix goes into
+that dict and into `extras.EXTRA_MODULES`, and a test asserts the two agree.
 
 **2. Never hand-write an install command.** Always route through
 `extras.install_command()`, or relay what an error already printed.
@@ -246,6 +253,22 @@ new that follows links between articles goes through `links.py`.
 **Configuration is a config change, not a code change.** Adding a wiki section
 is an edit to `okf.toml`. If you find yourself adding a section name to a
 Python file, you are solving it in the wrong layer.
+
+**`kb-ingest convert` owns the conversion record.** A converted `.md` carries
+`converted_from`, `converted_sha256`, `converter` and `converted`, and
+`list-unconverted` and `convert` compare the hash to decide what is stale.
+Both go through `frontmatter`, and `convert` builds the rest of the raw
+identity keys with `okf.migrate_raw` instead of writing them itself. It keeps
+every key already on the file, so `compile: false` survives a reconversion.
+Frontmatter that cannot be read is the one exception: `--force` discards it with
+a warning, because `list-unconverted` files that markdown under `legacy` and
+points at `--force`. Images from the markitdown formats are saved as
+`image-<namespace>-NNN.<ext>` in `<raw>/images/<stem>/`, where the namespace is
+a short hash of the original's bundle-relative path, so two originals with one
+stem keep their own images and a reconversion removes only its own. PDF figures
+keep the `page-NNN-N` names of `extract-pdf` and can still collide.
+Markitdown runs with plugins off and no `llm_client` or Document Intelligence
+endpoint, so nothing leaves the machine. Do not add one.
 
 **CLI style:** typer for everything except `kb-video`, which predates the rest
 and uses argparse. Boolean flags carry `# noqa: FBT002` — see `search.py`. A
