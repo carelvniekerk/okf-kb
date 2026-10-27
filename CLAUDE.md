@@ -260,6 +260,13 @@ Python file, you are solving it in the wrong layer.
 Both go through `frontmatter`, and `convert` builds the rest of the raw
 identity keys with `okf.migrate_raw` instead of writing them itself. It keeps
 every key already on the file, so `compile: false` survives a reconversion.
+Frontmatter that cannot be read is the one exception: `--force` discards it with
+a warning, because `list-unconverted` files that markdown under `legacy` and
+points at `--force`. Images from the markitdown formats are saved as
+`image-<namespace>-NNN.<ext>` in `<raw>/images/<stem>/`, where the namespace is
+a short hash of the original's bundle-relative path, so two originals with one
+stem keep their own images and a reconversion removes only its own. PDF figures
+keep the `page-NNN-N` names of `extract-pdf` and can still collide.
 Markitdown runs with plugins off and no `llm_client` or Document Intelligence
 endpoint, so nothing leaves the machine. Do not add one.
 

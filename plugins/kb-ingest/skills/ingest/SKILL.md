@@ -38,6 +38,7 @@ Do not use WebFetch to save a page: it returns a model's rendering of the page, 
    A document outside `<raw>` should be moved or copied into the bundle first, with the user's agreement, so the source lives there: `<raw>/papers/` for papers and `<raw>/documents/` for everything else.
    `convert` records the document's hash in the markdown, so running it again on an unchanged document says it is up to date.
    If it refuses because a markdown file with no conversion record is in the way, tell the user and offer `--force`, which replaces the body and keeps the frontmatter.
+   If the file's frontmatter cannot be read, `--force` discards it and warns, so say that when you offer it.
    A legacy `.doc` or `.ppt` is not supported: ask the user to save it as `.docx` or `.pptx` first.
    An arXiv warning about few section headings means the conversion is likely incomplete: tell the user, and offer to delete the markdown and re-ingest from the PDF.
 3. Commit what the command wrote: `git add <raw> && git commit -m "ingest: <short description>"`.

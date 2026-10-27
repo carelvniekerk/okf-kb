@@ -76,6 +76,7 @@ Compile works only from markdown, so the converted `.md` is the source and `sour
   Do that before step 3, so step 4 prunes the wiki articles that cited it.
 - `legacy`: markdown with no conversion record, which may be hand-written.
   Mention them once and offer `kb-ingest convert --force <file>`, which replaces the body and keeps the frontmatter.
+  If the file's frontmatter cannot be read, `--force` discards it and warns, so say that when you offer it.
   Never reconvert them unasked.
 
 `kb-ingest convert` needs the `[ingest]` extra, which the `kb` plugin does not.

@@ -671,24 +671,70 @@ def _smaller_side(data: bytes) -> int | None:
     return min(pixmap.width, pixmap.height)
 
 
-def _extract_data_uri_images(text: str, image_dir: Path, md_dir: Path) -> str:
+def _image_namespace(original: str) -> str:
+    """Name the image files of one original, so same-stem originals never share one.
+
+    Every original with one stem shares ``<raw>/images/<stem>/``, and
+    ``kb-health`` looks for that directory by name, so the directory cannot
+    change. The file names carry the namespace instead.
+
+    Args:
+        original: The original's path relative to the bundle root, in POSIX form.
+
+    Returns:
+        The first eight hex digits of its SHA-256. Eight digits are 32 bits, which
+        makes a clash between two paths in one bundle negligible.
+
+    """
+    return hashlib.sha256(original.encode()).hexdigest()[:8]
+
+
+def _remove_images(image_dir: Path, namespace: str) -> None:
+    """Delete the images that an earlier conversion of one original saved.
+
+    Only ``image-<namespace>-NNN.<ext>`` goes, so a clipping image, a PDF figure
+    or another original's image in the same directory survives.
+
+    Args:
+        image_dir: The directory the earlier conversion saved to. It may not exist.
+        namespace: The original's :func:`_image_namespace`.
+
+    """
+    if not image_dir.is_dir():
+        return
+    saved = re.compile(rf"image-{re.escape(namespace)}-\d{{3,}}\.[A-Za-z0-9]+")
+    for path in image_dir.iterdir():
+        if path.is_file() and saved.fullmatch(path.name):
+            path.unlink()
+
+
+def _extract_data_uri_images(
+    text: str,
+    image_dir: Path,
+    md_dir: Path,
+    namespace: str,
+) -> str:
     """Save every base64 image in ``text`` to disk and link it by relative path.
 
     markitdown inlines Office images as data URIs, which would put megabytes of
     base64 into a raw file and make every diff unreadable. Images whose shorter
     side is under :data:`MIN_FIGURE_PX` are dropped, as for PDFs. An image whose
-    size cannot be read is kept, with a warning.
+    size cannot be read is kept, with a warning. The images that an earlier
+    conversion of the same original saved are removed first, so an original that
+    lost an image does not leave it behind.
 
     Args:
         text: Markdown holding ``![alt](data:image/<kind>;base64,...)`` links.
-        image_dir: Where to save the images, as ``image-NNN.<ext>``. Created only
-            if there is an image to save.
+        image_dir: Where to save the images, as ``image-<namespace>-NNN.<ext>``.
+            Created only if there is an image to save.
         md_dir: Directory of the markdown file, so links resolve from it.
+        namespace: The original's :func:`_image_namespace`.
 
     Returns:
         The markdown with each kept image linked relatively, and no blank-line runs.
 
     """
+    _remove_images(image_dir, namespace)
     position = 0
     saved = 0
 
@@ -710,7 +756,7 @@ def _extract_data_uri_images(text: str, image_dir: Path, md_dir: Path) -> str:
             re.sub(r"\W", "", kind.removeprefix("x-")),
         )
         image_dir.mkdir(parents=True, exist_ok=True)
-        path = image_dir / f"image-{position:03d}.{extension}"
+        path = image_dir / f"image-{namespace}-{position:03d}.{extension}"
         path.write_bytes(data)
         saved += 1
         rel = Path(os.path.relpath(path.resolve(), md_dir.resolve())).as_posix()
@@ -723,7 +769,12 @@ def _extract_data_uri_images(text: str, image_dir: Path, md_dir: Path) -> str:
     return re.sub(r"\n{3,}", "\n\n", text).strip() + "\n"
 
 
-def _markitdown_to_markdown(source: Path, image_dir: Path, md_dir: Path) -> str:
+def _markitdown_to_markdown(
+    source: Path,
+    image_dir: Path,
+    md_dir: Path,
+    namespace: str,
+) -> str:
     """Convert an Office document, e-book or Outlook message with markitdown.
 
     Plugins are disabled and no ``llm_client`` or Document Intelligence endpoint
@@ -733,6 +784,7 @@ def _markitdown_to_markdown(source: Path, image_dir: Path, md_dir: Path) -> str:
         source: The document to convert.
         image_dir: Where to save its images.
         md_dir: Directory of the markdown file, so image links resolve from it.
+        namespace: The original's :func:`_image_namespace`, which names its images.
 
     Returns:
         The markdown text.
@@ -757,20 +809,33 @@ def _markitdown_to_markdown(source: Path, image_dir: Path, md_dir: Path) -> str:
         )
     except (FileConversionException, UnsupportedFormatException) as exc:
         _fail(f"Could not convert {source}: {exc}")
-    return _extract_data_uri_images(result.text_content, image_dir, md_dir)
+    return _extract_data_uri_images(result.text_content, image_dir, md_dir, namespace)
 
 
-def _convert_pdf(source: Path, image_dir: Path, md_dir: Path) -> str:
+def _convert_pdf(
+    source: Path,
+    image_dir: Path,
+    md_dir: Path,
+    _namespace: str,
+) -> str:
+    # PDF figures keep the page-NNN-N names that extract-pdf writes, so two
+    # same-stem PDFs can still share an image directory.
     return _pdf_to_markdown(source, image_dir, md_dir)[0]
 
 
-def _convert_html(source: Path, _image_dir: Path, _md_dir: Path) -> str:
+def _convert_html(
+    source: Path,
+    _image_dir: Path,
+    _md_dir: Path,
+    _namespace: str,
+) -> str:
     return _html_to_markdown(source.read_text(encoding="utf-8"))
 
 
 #: Converter name and function for each suffix, taking ``(original, image_dir,
-#: md_dir)`` and returning the markdown body. The name goes into ``converter:``.
-_CONVERTERS: dict[str, tuple[str, Callable[[Path, Path, Path], str]]] = {
+#: md_dir, namespace)`` and returning the markdown body. The name goes into
+#: ``converter:``.
+_CONVERTERS: dict[str, tuple[str, Callable[[Path, Path, Path, str], str]]] = {
     PDF_SUFFIX: ("pymupdf", _convert_pdf),
     **dict.fromkeys(HTML_SUFFIXES, ("markdownify", _convert_html)),
     **dict.fromkeys(MARKITDOWN_SUFFIXES, ("markitdown", _markitdown_to_markdown)),
@@ -961,6 +1026,43 @@ def _converted_frontmatter(
     return okf.reorder_raw(result)
 
 
+def _existing_frontmatter(output: Path, *, force: bool) -> frontmatter.Frontmatter:
+    """Read the frontmatter of the markdown file that a conversion will replace.
+
+    A block that cannot be read has nothing to keep, and ``list-unconverted``
+    files such a file under ``legacy`` and points the user at ``--force``. So
+    ``--force`` discards the block and says so, and without it the file is left
+    as it is.
+
+    Args:
+        output: The existing markdown file.
+        force: Whether the user passed ``--force``.
+
+    Returns:
+        The file's frontmatter, or an empty mapping for an unreadable block that
+        ``--force`` discards.
+
+    Raises:
+        typer.Exit: With code 1 when the block cannot be read and ``force`` is
+            not set.
+
+    """
+    try:
+        return frontmatter.load(output).frontmatter
+    except frontmatter.FrontmatterError as exc:
+        if not force:
+            _fail(
+                f"{exc}. Repair or remove the file, or pass --force to discard "
+                "its frontmatter and replace the file.",
+            )
+        typer.echo(
+            f"[WARN] {exc}. Discarded the unreadable frontmatter, and the "
+            "converted file starts from a new one.",
+            err=True,
+        )
+        return {}
+
+
 @app.command()
 def convert(
     file: Annotated[
@@ -982,7 +1084,8 @@ def convert(
         typer.Option(
             "--force",
             help="Replace markdown that has no conversion record or belongs to "
-            "another original, keeping its frontmatter.",
+            "another original, keeping its frontmatter. Frontmatter that cannot "
+            "be read is discarded, with a warning.",
         ),
     ] = False,
 ) -> None:
@@ -992,7 +1095,11 @@ def convert(
     PowerPoint, Excel, EPUB and Outlook messages go through markitdown. The
     markdown names the original and its SHA-256, so a later run can tell whether
     it is up to date. A markdown file with no such record may be hand-written, so
-    it is only replaced with ``--force``.
+    it is only replaced with ``--force``, and so is one whose frontmatter cannot
+    be read, which loses that frontmatter. Images from Word, PowerPoint, Excel,
+    EPUB and Outlook files are named ``image-<namespace>-NNN.<ext>``, so two
+    originals with one stem keep their own, and a reconversion removes only the
+    images its original wrote.
 
     Raises:
         typer.Exit: With code 1 for a markdown or unsupported file, or for an
@@ -1018,10 +1125,7 @@ def convert(
 
     existing: frontmatter.Frontmatter = {}
     if output.exists():
-        try:
-            existing = frontmatter.load(output).frontmatter
-        except frontmatter.FrontmatterError as exc:
-            _fail(f"{exc}. Repair or remove the file, then convert again.")
+        existing = _existing_frontmatter(output, force=force)
         recorded = _recorded_original(output, existing)
         if recorded is None and not force:
             _fail(
@@ -1042,7 +1146,8 @@ def convert(
             return
 
     name, converter = _CONVERTERS[suffix]
-    body = converter(source, image_dir, output.parent)
+    namespace = _image_namespace(cfg.relative(source).as_posix())
+    body = converter(source, image_dir, output.parent, namespace)
     record = _conversion_record(source, output, name, digest)
     meta = _converted_frontmatter(existing, record, output, body, cfg)
     output.write_text(frontmatter.dumps(meta, body), encoding="utf-8")
