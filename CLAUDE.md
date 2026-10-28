@@ -319,6 +319,13 @@ ignores `hooks`, `mcpServers` and `permissionMode`, so its `tools` list is the
 only enforcement of read-only. Nothing in `tests/test_skills.py` covers agents
 yet, so test one by running its skill against a bundle in `scratch/`.
 
+**Progress reporting is optional and limited to work that fans out.**
+`/kb:verify` on a directory and step 5 of `/kb:compile` report through
+`mcp__savvy-progress__progress`, and `kb:source-reviewer` lists
+`mcp__savvy-progress__step` in `tools`. Each skips reporting silently when the
+savvy-progress plugin is absent. That server is not the plugin's own, so the
+grant carries no `mcp__plugin_` prefix and the test below does not check it.
+
 **A plugin's MCP tools carry the plugin's prefix**:
 `mcp__plugin_<plugin>_<server>__<tool>`, as `kb-query`'s do. The test fails on
 a grant that names a server the plugin does not ship.

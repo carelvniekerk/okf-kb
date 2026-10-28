@@ -7,7 +7,7 @@ description: >
   when the user says "verify", "sign off on" or "review this article against its
   sources".
 disable-model-invocation: true
-allowed-tools: Read Edit Bash(kb-doctor paths) Bash(kb-index) Bash(kb-index *) Bash(kb-health) Bash(kb-health *) Bash(git add *) Bash(git commit *) Bash(date *)
+allowed-tools: Read Edit Bash(kb-doctor paths) Bash(kb-index) Bash(kb-index *) Bash(kb-health) Bash(kb-health *) Bash(git add *) Bash(git commit *) Bash(date *) mcp__savvy-progress__progress
 argument-hint: <wiki article path, or a directory to work through one article at a time>
 ---
 
@@ -41,6 +41,7 @@ When unsure whether the user really reviewed the content, ask.
 - 4. Append the entry
 - 5. Regenerate, log and commit
 - Machine confirmation
+- Progress reporting
 
 ## 1. Load the article and its sources
 
@@ -132,3 +133,17 @@ verified:
 
 This lifts an article to machine-confirmed.
 Tell the user what that means: the links resolve and the schema is well-formed, and nothing more about whether the article is true.
+
+## Progress reporting
+
+Report only for a directory of two or more articles, because the reviewer's own steps already show in the agents panel for a single article.
+Report to savvy-progress from the main session only, through `mcp__savvy-progress__progress`.
+If the tool is deferred, load it with `ToolSearch select:mcp__savvy-progress__progress`, and skip reporting silently if it is absent.
+Never call `mcp__savvy-progress__step` here, because only `kb:source-reviewer` reports steps.
+Send the plan once step 1 has listed the articles.
+Call it with `title: "Verify <directory name>"`, `total: <N>`, `phase: "delegate"` and one task per article in working order, each `{title: "Review <stem>", tier: "medium", after: [<previous task number>]}`.
+`<stem>` is the article's filename without its extension, with the parent folder added when two stems match.
+Pass each task title verbatim as the `Agent` description when you spawn `kb:source-reviewer` in step 2, because the panel matches runs to tasks by that string.
+Send `done: <n>` with `phase: "review"` once an article is settled, whether that means signed off or left unverified.
+Keep `title` identical across the calls.
+End every path, an abort included, with `finished: true` and `phase: "close"`, so the bar does not stay up when a source is missing, drift stops the run or the user declines.

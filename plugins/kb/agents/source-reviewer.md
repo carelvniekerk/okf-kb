@@ -1,7 +1,7 @@
 ---
 name: source-reviewer
 description: Reads one wiki article back against every source it cites and reports drift, misattribution, wrong detail and stale claims, with quoted evidence. Use when /kb:verify needs the article-against-sources comparison, or when the user asks for a fresh read of an article's claims against its raw sources.
-tools: Read, Grep, Glob
+tools: Read, Grep, Glob, mcp__savvy-progress__step
 model: sonnet
 maxTurns: 40
 ---
@@ -35,3 +35,10 @@ Return, in this order:
 
 Keep the result under 60 lines and leave out claims that match their sources.
 An empty result is a finding, so say plainly when you found nothing.
+
+## Progress reporting
+
+Right after reading the brief, call `mcp__savvy-progress__step` with `total` and `done: 0`, planning one step for the article, one for each source and one for the findings.
+Call it again with the new `done` and a few-word `note` as each step finishes, and end with `done` equal to `total`.
+If the tool is not available, skip reporting silently.
+The calls only draw a progress bar, so leave them out of your returned result.

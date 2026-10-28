@@ -8,7 +8,7 @@ description: >
   the indexes, runs the health check and commits. Use when the user says
   "compile", "update the wiki" or "process new sources".
 disable-model-invocation: true
-allowed-tools: Read Write Edit Bash(kb-*) Bash(git log *) Bash(git diff *) Bash(git status *) Bash(git show *) Bash(git add *) Bash(git rm *) Bash(git commit *) Bash(basename *) Bash(date *) Bash(rg *)
+allowed-tools: Read Write Edit Bash(kb-*) Bash(git log *) Bash(git diff *) Bash(git status *) Bash(git show *) Bash(git add *) Bash(git rm *) Bash(git commit *) Bash(basename *) Bash(date *) Bash(rg *) mcp__savvy-progress__progress
 ---
 
 # Compile
@@ -29,6 +29,7 @@ The wiki is only as trustworthy as its link to the sources, so the rule that gov
 - 7. Run the health check
 - 8. Append to the log
 - 9. Commit
+- Progress reporting
 
 ## Rules for everything you write
 
@@ -224,3 +225,14 @@ git commit -m "compile: <brief summary of what was integrated>"
 ```
 
 Do not use `git add -A`, because the bundle may hold a live meeting note or other work in progress.
+
+## Progress reporting
+
+Report only the integration loop in step 5, and only when it has two or more sources.
+Report to savvy-progress from the main session only, through `mcp__savvy-progress__progress`.
+If the tool is deferred, load it with `ToolSearch select:mcp__savvy-progress__progress`, and skip reporting silently if it is absent.
+Never call `mcp__savvy-progress__step` here, because only agents report steps.
+This skill spawns no agents, so send no `tasks`, because their titles would match no `Agent` run.
+Once step 3 has settled which sources to integrate, call it with `title: "Compile wiki"` and `total: <N>`, where `<N>` counts the new and modified sources the user agreed to include.
+Send `done: <n>` after each source's metadata is updated, and keep `title` identical across the calls.
+End every path, an abort included, with `finished: true` and `phase: "close"`, so the bar does not stay up when the user stops the run.
