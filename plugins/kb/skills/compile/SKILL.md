@@ -233,6 +233,7 @@ Report to savvy-progress from the main session only, through `mcp__savvy-progres
 If the tool is deferred, load it with `ToolSearch select:mcp__savvy-progress__progress`, and skip reporting silently if it is absent.
 Never call `mcp__savvy-progress__step` here, because only agents report steps.
 This skill spawns no agents, so send no `tasks`, because their titles would match no `Agent` run.
-Once step 3 has settled which sources to integrate, call it with `title: "Compile wiki"` and `total: <N>`, where `<N>` counts the new and modified sources the user agreed to include.
+Once step 3 has settled which sources to integrate, call it with `title: "Compile wiki"`, `total: <N>` and `phase: "delegate"`, where `<N>` counts the new and modified sources the user agreed to include.
+Without a `phase` the bar stays on "Plan" and never shows the count.
 Send `done: <n>` after each source's metadata is updated, and keep `title` identical across the calls.
 End every path, an abort included, with `finished: true` and `phase: "close"`, so the bar does not stay up when the user stops the run.

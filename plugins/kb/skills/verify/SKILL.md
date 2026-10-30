@@ -54,6 +54,7 @@ For a directory, work through it one article at a time, with a separate confirma
 ## 2. Present the comparison
 
 Spawn `kb:source-reviewer` with the article's path and the source paths from step 1, and ask for its findings with quoted passages.
+End the brief with the reporting line from the Progress reporting section, also for a single article, because the reviewer's steps only reach the panel when the brief asks for them.
 Check any `definite` finding against the source yourself before you relay it, because a reviewer can misread.
 Show the user, per source, what the article claims and where each claim comes from.
 Lead with the problems:
@@ -144,6 +145,13 @@ Send the plan once step 1 has listed the articles.
 Call it with `title: "Verify <directory name>"`, `total: <N>`, `phase: "delegate"` and one task per article in working order, each `{title: "Review <stem>", tier: "medium", after: [<previous task number>]}`.
 `<stem>` is the article's filename without its extension, with the parent folder added when two stems match.
 Pass each task title verbatim as the `Agent` description when you spawn `kb:source-reviewer` in step 2, because the panel matches runs to tasks by that string.
-Send `done: <n>` with `phase: "review"` once an article is settled, whether that means signed off or left unverified.
+Send `done: <n>` with `phase: "review"` once an article is settled, whether that means signed off or left unverified, and send `phase: "delegate"` before you spawn the reviewer for the next article.
+Send one call per settled article and never batch several into one `done`.
 Keep `title` identical across the calls.
+End every `kb:source-reviewer` brief with this line, written exactly like this:
+
+```text
+Progress reporting: before any other work, call mcp__savvy-progress__step with total (your plan in 3-8 steps) and done: 0 and call it again with done and a few-word note as each step finishes. It only draws a progress bar.
+```
+
 End every path, an abort included, with `finished: true` and `phase: "close"`, so the bar does not stay up when a source is missing, drift stops the run or the user declines.
