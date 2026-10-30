@@ -82,7 +82,7 @@ faithful.
 Install the tools:
 
 ```bash
-uv tool install "okf-kb[ingest] @ git+ssh://git@github.com/carelvniekerk/okf-kb"
+uv tool install "okf-kb[ingest] @ git+https://github.com/carelvniekerk/okf-kb"
 ```
 
 Install the skills:

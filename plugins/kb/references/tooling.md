@@ -41,10 +41,10 @@ Give the user the one row matching their enabled plugins, and nothing broader, b
 
 | Enabled optional plugins | Install |
 | --- | --- |
-| none | `uv tool install "okf-kb @ git+ssh://git@github.com/carelvniekerk/okf-kb"` |
-| `kb-ingest` | `uv tool install "okf-kb[ingest] @ git+ssh://git@github.com/carelvniekerk/okf-kb"` |
-| `kb-video` | `uv tool install "okf-kb[video] @ git+ssh://git@github.com/carelvniekerk/okf-kb"` |
-| both | `uv tool install "okf-kb[all] @ git+ssh://git@github.com/carelvniekerk/okf-kb"` |
+| none | `uv tool install "okf-kb @ git+https://github.com/carelvniekerk/okf-kb"` |
+| `kb-ingest` | `uv tool install "okf-kb[ingest] @ git+https://github.com/carelvniekerk/okf-kb"` |
+| `kb-video` | `uv tool install "okf-kb[video] @ git+https://github.com/carelvniekerk/okf-kb"` |
+| both | `uv tool install "okf-kb[all] @ git+https://github.com/carelvniekerk/okf-kb"` |
 
 Then stop, and do not scaffold a bundle whose tools cannot run.
 
