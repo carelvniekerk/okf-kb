@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     from collections.abc import Generator, Mapping
 
 #: Where a released install comes from. The package is not on PyPI.
-GIT_SOURCE = "git+ssh://git@github.com/carelvniekerk/okf-kb"
+GIT_SOURCE = "git+https://github.com/carelvniekerk/okf-kb"
 
 #: Extras, and the import names each one makes available. Keys match
 #: ``[project.optional-dependencies]`` in ``pyproject.toml``; values are import
